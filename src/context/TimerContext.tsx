@@ -106,7 +106,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     if (state.isRunning && !state.isPaused && state.endTime) {
       const calculateTimeLeft = () => {
         const now = Date.now()
-        const end = new Date(state.endTime).getTime()
+        const end = new Date(state.endTime as string).getTime();
         const diff = Math.max(0, Math.floor((end - now) / 1000))
         if (diff <= 0) {
           handlePhaseComplete()
