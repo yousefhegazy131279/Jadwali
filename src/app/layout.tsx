@@ -5,8 +5,8 @@ import { Cairo, Amiri } from 'next/font/google'
 import { Toaster } from 'sonner'
 import { BodyWrapper } from '@/components/BodyWrapper'
 import PWAProvider from '@/components/PWAProvider'
-import { TourProvider } from '@/context/TourContext' // ✅ إضافة
-import TourOverlay from '@/components/TourOverlay' // ✅ إضافة
+import { TourProvider } from '@/context/TourContext'
+import TourOverlay from '@/components/TourOverlay'
 
 const cairo = Cairo({
   subsets: ['arabic'],
@@ -39,8 +39,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ar" dir="rtl" className={`${cairo.variable} ${amiri.variable}`}>
+      <head>
+        <link rel="icon" href="/logo.png" />
+        <link rel="apple-touch-icon" href="/logo.png" />
+      </head>
       <body>
-        <TourProvider> {/* ✅ الجولة تغلف كل شيء */}
+        <TourProvider>
           <SupabaseProvider>
             <ThemeProvider>
               <BodyWrapper>
@@ -49,7 +53,7 @@ export default function RootLayout({
               </BodyWrapper>
             </ThemeProvider>
           </SupabaseProvider>
-          <TourOverlay /> {/* ✅ طبقة الجولة تكون خارج BodyWrapper لكن داخل TourProvider */}
+          <TourOverlay />
         </TourProvider>
         <PWAProvider />
       </body>
