@@ -9,6 +9,7 @@ type SupabaseContextType = {
   user: any | null
   fullName: string | null
   isAdmin: boolean | null
+  isLoading: boolean // ✅ أضفنا هذا
   updateFullName: (name: string) => Promise<void>
 }
 
@@ -19,14 +20,15 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any | null>(null)
   const [fullName, setFullName] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
+  const [isLoading, setIsLoading] = useState(true) // ✅ حالة التحميل
 
   useEffect(() => {
     const fetchUser = async () => {
+      setIsLoading(true)
       const { data } = await supabase.auth.getUser()
       const u = data.user
       setUser(u)
 
-      // ابدأ من user_metadata
       let name = u?.user_metadata?.full_name || u?.user_metadata?.name || null
 
       if (u) {
@@ -38,7 +40,6 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
 
         if (!error && profile) {
           setIsAdmin(profile.role === 'admin')
-          // استخدم الاسم من profiles إذا كان متوفرًا
           if (profile.full_name) name = profile.full_name
         } else {
           setIsAdmin(false)
@@ -48,6 +49,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       }
 
       setFullName(name)
+      setIsLoading(false)
     }
 
     fetchUser()
@@ -76,6 +78,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       }
 
       setFullName(name)
+      setIsLoading(false)
     })
 
     return () => {
@@ -86,12 +89,10 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const updateFullName = async (name: string) => {
     if (!user) return
 
-    // 1) تحديث user_metadata في auth.users
     const { error: authError } = await supabase.auth.updateUser({
       data: { full_name: name, name: name },
     })
 
-    // 2) تحديث أو إنشاء سجل في جدول profiles
     const { error: profileError } = await supabase
       .from('profiles')
       .upsert(
@@ -109,7 +110,9 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <SupabaseContext.Provider value={{ supabase, user, fullName, isAdmin, updateFullName }}>
+    <SupabaseContext.Provider
+      value={{ supabase, user, fullName, isAdmin, isLoading, updateFullName }}
+    >
       {children}
     </SupabaseContext.Provider>
   )
