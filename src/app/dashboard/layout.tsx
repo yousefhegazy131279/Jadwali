@@ -1,14 +1,13 @@
-// src/app/(dashboard)/layout.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
 import { Sidebar } from '@/components/Sidebar'
 import { Footer } from '@/components/Footer'
 import { NeonParticles } from '@/components/NeonParticles'
-// ❌ حذف الـ FloatingTimer
 import { TimerProvider } from '@/context/TimerContext'
 import AOS from 'aos'
 import 'aos/dist/aos.css'
+
 
 export default function DashboardLayout({
   children,
@@ -19,10 +18,10 @@ export default function DashboardLayout({
 
   useEffect(() => {
     AOS.init({
-      duration: 600,
-      easing: 'ease-out-cubic',
-      once: true,
-      mirror: true,
+      duration: 400,     // أسرع من 600
+      easing: 'ease-out',
+      once: true,        // لا يعيد عند التمرير لأعلى
+      mirror: false,     // مهم جدًا
     })
 
     const handleStorageChange = () => {
@@ -38,7 +37,8 @@ export default function DashboardLayout({
 
   return (
     <TimerProvider>
-      <div className="relative min-h-screen bg-[var(--bg-primary)]">
+      <div className="relative min-h-screen bg-[var(--bg-primary)] overflow-x-hidden">
+        {/* الخلفية الزخرفية */}
         <div className="fixed inset-0 z-0 pointer-events-none">
           <NeonParticles />
           <div className="absolute top-10 left-10 w-80 h-80 rounded-full bg-[#D4AF37]/5 blur-3xl animate-pulse" style={{ animationDuration: '6s' }} />
@@ -48,17 +48,18 @@ export default function DashboardLayout({
 
         <Sidebar />
 
+        {/* المحتوى الرئيسي: flex column لضمان ظهور الفوتر في الأسفل */}
         <main
-          className="relative z-10 min-h-screen transition-all duration-300"
-          style={{ marginRight: isCollapsed ? '80px' : '256px' }}
+          className={`relative z-10 min-h-screen flex flex-col transition-all duration-300 ${
+            isCollapsed ? 'md:pr-20' : 'md:pr-64'
+          } pr-0`}
         >
-          <div className="p-6 pb-24">
+          <div className="flex-1 p-4 sm:p-6">
             {children}
           </div>
+          {/* الفوتر يظهر دائمًا أسفل المحتوى */}
           <Footer />
         </main>
-
-        {/* ❌ تم حذف <FloatingTimer /> */}
       </div>
     </TimerProvider>
   )

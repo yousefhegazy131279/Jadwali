@@ -1,7 +1,8 @@
 import { type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
+  // ✅ لا يوجد أي توجيه خاص بـ /admin هنا، فقط تحديث الجلسة العامة
   return await updateSession(request)
 }
 

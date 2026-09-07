@@ -1,87 +1,143 @@
 export type TourStep = {
-    path: string
-    selector: string
-    title: string
-    description: string
-    placement?: 'top' | 'bottom' | 'right' | 'left' | 'center'
-  }
-  
-  export const tourSteps: TourStep[] = [
-    {
-      path: '/dashboard',
-      selector: '[data-tour="dashboard-header"]',
-      title: 'مرحباً بك في جَدْوَلِي',
-      description: 'هذه لوحة التحكم الرئيسية. من هنا يمكنك رؤية ملخص يومك والجلسات والمهام.',
-      placement: 'bottom',
-    },
-    {
-      path: '/dashboard',
-      selector: '[data-tour="dashboard-stats"]',
-      title: 'الإحصائيات',
-      description: 'هذه البطاقات تعرض عدد الجداول، المهام المتبقية، الجلسات المتبقية والمنجزة.',
-      placement: 'bottom',
-    },
-    {
-      path: '/dashboard',
-      selector: '[data-tour="dashboard-timer"]',
-      title: 'المؤقت',
-      description: 'عند بدء جلسة من جدولك، سيظهر هنا مؤقت دائري مع إمكانية الإيقاف والاستئناف.',
-      placement: 'left',
-    },
-    {
-      path: '/dashboard',
-      selector: '[data-tour="dashboard-schedules"]',
-      title: 'الجداول',
-      description: 'هنا قائمة بجداولك. يمكنك النقر على أي جدول لفتحه أو حذفه.',
-      placement: 'top',
-    },
-    {
-      path: '/dashboard/planner',
-      selector: '[data-tour="planner-form"]',
-      title: 'إنشاء جدول جديد',
-      description: 'أدخل عنوان الجدول واختر التاريخ والوقت. لن يُسمح بوقت في الماضي.',
-      placement: 'bottom',
-    },
-    {
-      path: '/dashboard/planner',
-      selector: '[data-tour="planner-tasks"]',
-      title: 'المهام الأساسية',
-      description: 'أضف المهام الدراسية مع التصنيف والمدة بالساعات.',
-      placement: 'bottom',
-    },
-    {
-      path: '/dashboard/planner',
-      selector: '[data-tour="planner-pomodoro"]',
-      title: 'إعدادات بومودورو',
-      description: 'خصص مدة الجلسة والراحة حسب رغبتك.',
-      placement: 'left',
-    },
-    {
-      path: '/dashboard/planner',
-      selector: '[data-tour="planner-generate"]',
-      title: 'إنشاء الجدول',
-      description: 'اضغط هنا بعد ملء البيانات وسيتم إنشاء الجدول مع المهام والصلوات.',
-      placement: 'top',
-    },
-    {
-      path: '/dashboard/schedule',
-      selector: '[data-tour="schedule-list"]',
-      title: 'صفحة الجداول',
-      description: 'هنا تظهر جميع جداولك مع حالة التقدم. اضغط على أي بطاقة لفتح تفاصيلها والبدء بالجلسات.',
-      placement: 'bottom',
-    },
-    {
-      path: '/dashboard/workspace',
-      selector: '[data-tour="workspace-list"]',
-      title: 'المهام',
-      description: 'هنا يمكنك استعراض جميع المهام من جميع الجداول (قراءة فقط).',
-      placement: 'bottom',
-    },
-    {
-      path: '/dashboard/settings',
-      selector: '[data-tour="settings-theme"]',
-      title: 'الإعدادات',
-      description: 'غيّر المظهر، أوقات الصلاة، وإعدادات بومودورو.',
-      placement: 'bottom',
-    },
-  ]
+  path: string
+  selector: string
+  title: string
+  description: string
+  action: 'wait' | 'click' | 'input' | 'select'
+  actionTarget?: string
+  required?: boolean
+  autoNextPath?: string // المسار الكامل الذي ننتقل بعده تلقائيًا
+  autoNextPathPrefix?: string // بادئة المسار التي ننتقل بعدها تلقائيًا
+  skipNavigation?: boolean // لا نقوم بتوجيه عند هذه الخطوة
+}
+
+export const tourSteps: TourStep[] = [
+  // ========== لوحة التحكم ==========
+  {
+    path: '/dashboard',
+    selector: '[data-tour="dashboard-header"]',
+    title: 'مرحبًا بك في جَدْوَلِي!',
+    description: 'هذه لوحة التحكم الرئيسية. اضغط "التالي" للمتابعة.',
+    action: 'wait',
+  },
+  {
+    path: '/dashboard',
+    selector: '[data-tour="dashboard-stats"]',
+    title: 'الإحصائيات',
+    description: 'هذه البطاقات تعرض ملخص يومك. اضغط "التالي".',
+    action: 'wait',
+  },
+  {
+    path: '/dashboard',
+    selector: '[data-tour="dashboard-timer"]',
+    title: 'المؤقت الدائري',
+    description: 'عند بدء جلسة من جدولك، سيظهر هنا مؤقت دائري. اضغط "التالي".',
+    action: 'wait',
+  },
+  {
+    path: '/dashboard',
+    selector: '[data-tour="dashboard-schedules"]',
+    title: 'الجداول',
+    description: 'اضغط زر "أضف جدولاً جديداً".',
+    action: 'click',
+    actionTarget: 'button[data-tour="dashboard-add-schedule"]',
+    required: true,
+  },
+
+  // ========== المخطط ==========
+  {
+    path: '/dashboard/planner',
+    selector: 'input[placeholder="مثال: يوم عمل مكثف"]',
+    title: 'أدخل عنوان الجدول',
+    description: 'اكتب اسم الجدول في هذا الحقل المظلل.',
+    action: 'input',
+    actionTarget: 'input[placeholder="مثال: يوم عمل مكثف"]',
+    required: true,
+  },
+  {
+    path: '/dashboard/planner',
+    selector: 'input[placeholder="اسم المهمة"]',
+    title: 'أدخل اسم المهمة',
+    description: 'اكتب اسم المهمة الأولى هنا.',
+    action: 'input',
+    actionTarget: 'input[placeholder="اسم المهمة"]',
+    required: true,
+  },
+  {
+    path: '/dashboard/planner',
+    selector: 'input[type="date"]',
+    title: 'اختر التاريخ',
+    description: 'اختر تاريخ الجدول.',
+    action: 'input',
+    actionTarget: 'input[type="date"]',
+    required: true,
+  },
+  {
+    path: '/dashboard/planner',
+    selector: 'input[type="time"]',
+    title: 'اختر وقت البدء',
+    description: 'حدد وقت بدء الجدول.',
+    action: 'input',
+    actionTarget: 'input[type="time"]',
+    required: true,
+  },
+  {
+    path: '/dashboard/planner',
+    selector: 'button[type="submit"]',
+    title: 'إنشاء الجدول',
+    description: 'اضغط زر "إنشاء الجدول".',
+    action: 'click',
+    actionTarget: 'button[type="submit"]',
+    required: true,
+    autoNextPath: '/dashboard/schedule',
+  },
+
+  // ========== صفحة الجداول ==========
+  {
+    path: '/dashboard/schedule',
+    selector: '[data-tour="schedule-card"]',
+    title: 'افتح جدولك',
+    description: 'اضغط على بطاقة الجدول لفتح تفاصيلها.',
+    action: 'click',
+    actionTarget: '[data-tour="schedule-card"]',
+    required: true,
+    autoNextPathPrefix: '/dashboard/schedule/',
+  },
+
+  // ========== تفاصيل الجدول ==========
+  {
+    path: '/dashboard/schedule', // لن يتم استخدامه بسبب skipNavigation
+    skipNavigation: true,
+    selector: 'button:has(> svg.lucide-play)',
+    title: 'ابدأ الجلسة',
+    description: 'اضغط زر "ابدأ" في أول جلسة.',
+    action: 'click',
+    actionTarget: 'button:has(> svg.lucide-play)',
+    required: true,
+  },
+
+  // ========== المهام ==========
+  {
+    path: '/dashboard/workspace',
+    selector: '[data-tour="workspace-list"]',
+    title: 'المهام',
+    description: 'هنا تستعرض جميع المهام. اضغط "التالي".',
+    action: 'wait',
+  },
+
+  // ========== الإعدادات ==========
+  {
+    path: '/dashboard/settings',
+    selector: 'button[data-tour="toggle-theme"]',
+    title: 'تبديل المظهر',
+    description: 'هذا الزر يبدّل الوضع بين الداكن والفاتح. جرّبه إذا أردت، ثم اضغط "التالي" للمتابعة.',
+    action: 'wait', // ✅ بدون required
+  },
+  {
+    path: '/dashboard/settings',
+    selector: 'button[data-tour="toggle-focus"]',
+    title: 'وضع التركيز',
+    description: 'هذا الزر يفعّل أو يلغي وضع التركيز. جرّبه إذا أردت، ثم اضغط "التالي".',
+    action: 'wait', // ✅ بدون required
+  },
+]

@@ -6,7 +6,6 @@ import { useTheme } from '@/context/ThemeContext'
 export function NeonParticles() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const { theme } = useTheme()
-  // ✅ التصحيح: استخدام null كقيمة ابتدائية
   const animationRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -158,7 +157,6 @@ export function NeonParticles() {
     return () => {
       window.removeEventListener('resize', resizeCanvas)
       window.removeEventListener('mousemove', handleMouseMove)
-      // ✅ التحقق من وجود animationRef.current قبل الإلغاء
       if (animationRef.current !== null) {
         cancelAnimationFrame(animationRef.current)
       }
@@ -168,7 +166,7 @@ export function NeonParticles() {
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 -z-10 pointer-events-none"
+      className="fixed inset-0 -z-10 pointer-events-none neon-particles"
       style={{
         opacity: theme === 'light' ? 0.15 : 0.6,
         transition: 'opacity 0.5s ease'

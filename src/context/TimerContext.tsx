@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 
 type Phase = {
   type: 'work' | 'shortBreak' | 'longBreak'
-  duration: number
+  duration: number // بالثواني
   taskId?: string
   taskName?: string
   sessionNumber?: number
@@ -48,6 +48,32 @@ const defaultState: TimerState = {
 
 const STORAGE_KEY = 'jadwali_timer_state'
 
+function playAlertSound() {
+  try {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext
+    if (!AudioContext) return
+    const ctx = new AudioContext()
+    const playTone = (freq: number, start: number, duration: number, volume = 0.3) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.value = freq
+      gain.gain.setValueAtTime(0.001, ctx.currentTime + start)
+      gain.gain.exponentialRampToValueAtTime(volume, ctx.currentTime + start + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start(ctx.currentTime + start)
+      osc.stop(ctx.currentTime + start + duration)
+    }
+    playTone(880, 0, 0.3)
+    playTone(1100, 0.3, 0.4)
+    setTimeout(() => playTone(1320, 0, 0.5, 0.35), 800)
+  } catch (e) {
+    console.error('فشل تشغيل الصوت:', e)
+  }
+}
+
 function loadInitialState(): TimerState {
   if (typeof window === 'undefined') return defaultState
   try {
@@ -82,11 +108,10 @@ const TimerContext = createContext<TimerContextType | undefined>(undefined)
 export function TimerProvider({ children }: { children: ReactNode }) {
   const [timerState, setTimerState] = useState<TimerState>(loadInitialState)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  const savedStateRef = useRef<TimerState>(timerState)
+  const phaseCompletedRef = useRef(false) // ✅ منع التكرار عند الوصول إلى 0
 
   // حفظ الحالة في localStorage عند أي تغيير
   useEffect(() => {
-    savedStateRef.current = timerState
     try {
       const toSave = {
         ...timerState,
@@ -100,60 +125,41 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     } catch (_) {}
   }, [timerState])
 
-  // عند التحميل، إذا كان المؤقت يعمل أو متوقفًا مؤقتًا، احسب الوقت المتبقي
-  useEffect(() => {
-    const state = savedStateRef.current
-    if (state.isRunning && !state.isPaused && state.endTime) {
-      const calculateTimeLeft = () => {
-        const now = Date.now()
-        const end = new Date(state.endTime as string).getTime();
-        const diff = Math.max(0, Math.floor((end - now) / 1000))
-        if (diff <= 0) {
-          handlePhaseComplete()
-        } else {
-          setTimerState(prev => ({ ...prev, timeLeft: diff }))
-        }
-      }
-      calculateTimeLeft()
-      startInterval()
-    }
-  }, [])
-
-  const startInterval = useCallback(() => {
-    if (intervalRef.current) clearInterval(intervalRef.current)
-    intervalRef.current = setInterval(() => {
-      setTimerState(prev => {
-        if (!prev.isRunning || prev.isPaused) return prev
-        const newTime = prev.timeLeft - 1
-        if (newTime <= 0) {
-          handlePhaseComplete()
-          return { ...prev, timeLeft: 0 }
-        }
-        return { ...prev, timeLeft: newTime }
-      })
-    }, 1000)
-  }, [])
-
+  // ✅ دالة إكمال المرحلة الحالية، تستخدم عند انتهاء الوقت أو الضغط على إنهاء
   const handlePhaseComplete = useCallback(() => {
     setTimerState(prev => {
       if (prev.currentPhaseIndex === null) return prev
-      const nextIndex = prev.currentPhaseIndex + 1
-      const completedPhases = prev.completedPhases + 1
+
+      const currentIndex = prev.currentPhaseIndex
+      const currentPhase = prev.phases[currentIndex]
+      const nextIndex = currentIndex + 1
+      const completed = prev.completedPhases + 1
+
+      // تشغيل الصوت وإرسال الإشعار
+      playAlertSound()
+      if (currentPhase?.type === 'work') {
+        toast.success('✅ اكتملت جلسة عمل!')
+      } else if (currentPhase?.type === 'shortBreak') {
+        toast.info('☕ انتهت الراحة القصيرة')
+      } else if (currentPhase?.type === 'longBreak') {
+        toast.info('🛌 انتهت الراحة الطويلة')
+      }
+
       if (nextIndex < prev.phases.length) {
         const nextPhase = prev.phases[nextIndex]
         const now = Date.now()
         const endTime = new Date(now + nextPhase.duration * 1000).toISOString()
-        toast.info(`🔄 بدأت ${nextPhase.type === 'work' ? 'جلسة' : nextPhase.type === 'shortBreak' ? 'راحة قصيرة' : 'راحة طويلة'}`)
         return {
           ...prev,
           currentPhaseIndex: nextIndex,
           timeLeft: nextPhase.duration,
           endTime,
-          completedPhases,
+          completedPhases: completed,
           taskName: nextPhase.taskName || null,
           sessionNumber: nextPhase.sessionNumber || null,
         }
       } else {
+        toast.success('🎉 اكتملت جميع الجلسات!')
         return {
           ...prev,
           isRunning: false,
@@ -162,9 +168,37 @@ export function TimerProvider({ children }: { children: ReactNode }) {
           timeLeft: 0,
           endTime: null,
           completedPhases: prev.phases.length,
+          taskName: null,
+          sessionNumber: null,
         }
       }
     })
+  }, [])
+
+  // ✅ مراقبة وصول timeLeft إلى 0 لاستدعاء handlePhaseComplete مرة واحدة
+  useEffect(() => {
+    if (timerState.isRunning && !timerState.isPaused && timerState.timeLeft === 0) {
+      if (!phaseCompletedRef.current) {
+        phaseCompletedRef.current = true
+        handlePhaseComplete()
+      }
+    } else {
+      phaseCompletedRef.current = false
+    }
+  }, [timerState.timeLeft, timerState.isRunning, timerState.isPaused, handlePhaseComplete])
+
+  // ✅ بدء الفاصل الزمني للعد التنازلي
+  const startInterval = useCallback(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current)
+    intervalRef.current = setInterval(() => {
+      setTimerState(prev => {
+        if (!prev.isRunning || prev.isPaused) return prev
+        if (prev.timeLeft > 0) {
+          return { ...prev, timeLeft: prev.timeLeft - 1 }
+        }
+        return prev // يترك الباقي للمراقب useEffect
+      })
+    }, 1000)
   }, [])
 
   useEffect(() => {
@@ -177,6 +211,17 @@ export function TimerProvider({ children }: { children: ReactNode }) {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
   }, [timerState.isRunning, timerState.isPaused, startInterval])
+
+  // عند التحميل، إذا كان المؤقت يعمل، احسب الوقت المتبقي
+  useEffect(() => {
+    const state = loadInitialState()
+    if (state.isRunning && !state.isPaused && state.endTime) {
+      const now = Date.now()
+      const end = new Date(state.endTime).getTime()
+      const diff = Math.max(0, Math.floor((end - now) / 1000))
+      setTimerState(prev => ({ ...prev, timeLeft: diff }))
+    }
+  }, [])
 
   const startTimer = useCallback((scheduleId: string, scheduleTitle: string, phases: Phase[], startIndex: number) => {
     const phase = phases[startIndex]
@@ -247,7 +292,6 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     setTimerState(prev => ({ ...prev, isVisible: visible }))
   }, [])
 
-  // ✅ مراقبة حذف الجداول لإيقاف المؤقت (بدون فلتر)
   useEffect(() => {
     const supabase = createClient()
     const channel = supabase

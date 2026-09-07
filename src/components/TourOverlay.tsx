@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect, useState, useCallback } from 'react'
+import { motion } from 'framer-motion'
 import { useTour } from '@/context/TourContext'
 import { tourSteps } from '@/lib/tourSteps'
-import { X, ChevronRight, ChevronLeft } from 'lucide-react'
+import { X, ChevronRight, ChevronLeft, Lock } from 'lucide-react'
 
 function getElementPosition(selector: string) {
+  if (typeof document === 'undefined') return null
   const el = document.querySelector(selector)
   if (!el) return null
   const rect = el.getBoundingClientRect()
@@ -19,132 +20,141 @@ function getElementPosition(selector: string) {
 }
 
 export default function TourOverlay() {
-  const { isOpen, currentStep, nextStep, prevStep, skipTour } = useTour()
+  const { isOpen, currentStep, nextStep, prevStep, skipTour, isActionDone } = useTour()
   const [position, setPosition] = useState<{ top: number; left: number; width: number; height: number } | null>(null)
-  const [fallback, setFallback] = useState(false) // لعرض البطاقة في المنتصف إذا لم يُعثر على العنصر
-  const retryTimer = useRef<NodeJS.Timeout | null>(null)
+  const [fallback, setFallback] = useState(false)
+  const [placement, setPlacement] = useState<'top' | 'bottom' | 'center'>('top')
+
+  // ✅ فحص مبكر: إذا كانت الجولة مغلقة أو الخطوة غير موجودة، لا نعرض شيئًا
+  const step = isOpen ? tourSteps[currentStep] : undefined
+
+  const updatePosition = useCallback(() => {
+    if (!isOpen || !step) return
+    const pos = getElementPosition(step.selector)
+    if (pos) {
+      setPosition(pos)
+      setFallback(false)
+      const el = document.querySelector(step.selector)
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
+      const elementCenter = pos.top + pos.height / 2
+      const windowCenter = window.innerHeight / 2
+      setPlacement(elementCenter < windowCenter ? 'bottom' : 'top')
+    } else {
+      setFallback(true)
+      setPosition(null)
+      setPlacement('center')
+    }
+  }, [isOpen, step])
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || !step) return
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    const timer = setTimeout(updatePosition, 500)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      clearTimeout(timer)
+    }
+  }, [updatePosition, isOpen, step])
 
-    const step = tourSteps[currentStep]
-    let attempts = 0
-    const maxAttempts = 10 // 10 * 300ms = 3 ثوانٍ كحد أقصى
-    const attemptInterval = 300
+  useEffect(() => {
+    if (!isOpen || !step) return
+    const target = document.querySelector(step.selector)
+    if (target) {
+      target.classList.add('tour-highlight')
+      return () => target.classList.remove('tour-highlight')
+    }
+  }, [isOpen, step])
 
-    const tryFindElement = () => {
-      const pos = getElementPosition(step.selector)
-      if (pos) {
-        // وجدنا العنصر: مرر إليه واضبط الموضع
-        const el = document.querySelector(step.selector)
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        }
-        setPosition(pos)
-        setFallback(false)
-      } else {
-        attempts++
-        if (attempts >= maxAttempts) {
-          // لم نجد العنصر: اعرض البطاقة في منتصف الشاشة
-          setPosition(null)
-          setFallback(true)
-        } else {
-          // حاول مجددًا
-          retryTimer.current = setTimeout(tryFindElement, attemptInterval)
-        }
+  // ✅ إذا كانت الجولة مغلقة أو لا توجد خطوة، لا نعرض الطبقة
+  if (!isOpen || !step) return null
+
+  const isLast = currentStep === tourSteps.length - 1
+  const isNextDisabled = step.required && !isActionDone
+
+  let cardStyle: React.CSSProperties = {}
+  if (fallback || placement === 'center') {
+    cardStyle = { left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }
+  } else if (position) {
+    if (placement === 'top') {
+      cardStyle = {
+        top: position.top - 20,
+        left: position.left + position.width / 2,
+        transform: 'translate(-50%, -100%)',
+      }
+    } else {
+      cardStyle = {
+        top: position.top + position.height + 20,
+        left: position.left + position.width / 2,
+        transform: 'translate(-50%, 0)',
       }
     }
-
-    tryFindElement()
-
-    return () => {
-      if (retryTimer.current) clearTimeout(retryTimer.current)
-    }
-  }, [isOpen, currentStep])
-
-  if (!isOpen) return null
-
-  const step = tourSteps[currentStep]
-  const isLast = currentStep === tourSteps.length - 1
+  }
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[1000] pointer-events-none"
-      >
-        {/* خلفية معتمة */}
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="fixed inset-0 z-[2000] pointer-events-none"
+    >
+      {/* إطار التوهج حول العنصر المستهدف */}
+      {position && (
         <div
-          className="absolute inset-0 bg-black/85"
+          className="absolute border-2 border-[#D4AF37] rounded-lg pointer-events-none"
           style={{
-            clipPath: position
-              ? `polygon(0% 0%, 0% 100%, ${position.left}px 100%, ${position.left}px ${position.top}px, ${position.left + position.width}px ${position.top}px, ${position.left + position.width}px ${position.top + position.height}px, ${position.left}px ${position.top + position.height}px, ${position.left}px 100%, 100% 100%, 100% 0%)`
-              : undefined,
+            top: position.top - 4,
+            left: position.left - 4,
+            width: position.width + 8,
+            height: position.height + 8,
+            boxShadow: '0 0 30px rgba(212,175,55,0.9)',
           }}
         />
+      )}
 
-        {/* البطاقة التعليمية */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9, y: 20 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-          className={`absolute z-10 pointer-events-auto bg-white text-gray-900 border border-gray-300 rounded-2xl p-6 shadow-2xl max-w-md w-[90%] md:w-96 ${
-            fallback
-              ? 'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2' // في المنتصف إذا لم يوجد العنصر
-              : ''
-          }`}
-          style={
-            !fallback && position
-              ? {
-                  top: position.top - 20,
-                  left: position.left + position.width / 2,
-                  transform: 'translate(-50%, -100%)',
-                }
-              : undefined
-          }
-        >
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold text-xl text-gray-900 font-sans">
-              {step.title}
-            </h3>
+      {/* بطاقة الشرح - الوحيدة القابلة للنقر */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="absolute z-10 pointer-events-auto bg-white text-gray-900 border border-gray-300 rounded-2xl p-6 shadow-2xl max-w-md w-[90%] md:w-96"
+        style={cardStyle}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-xl">{step.title}</h3>
+          <button onClick={skipTour} className="p-1 rounded-lg hover:bg-gray-100">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+        <p className="text-base leading-relaxed">{step.description}</p>
+
+        {isNextDisabled && (
+          <p className="mt-3 text-sm text-amber-600 bg-amber-50 p-2 rounded-lg flex items-center gap-1">
+            <Lock className="w-4 h-4" /> قم بتنفيذ الإجراء المطلوب أولًا
+          </p>
+        )}
+
+        <div className="flex items-center justify-between mt-5">
+          <span className="text-sm text-gray-500">{currentStep + 1} / {tourSteps.length}</span>
+          <div className="flex gap-2">
+            {currentStep > 0 && (
+              <button onClick={prevStep} className="px-4 py-2 rounded-xl bg-gray-200">
+                السابق
+              </button>
+            )}
             <button
-              onClick={skipTour}
-              className="p-1 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+              onClick={nextStep}
+              disabled={isNextDisabled}
+              className={`px-5 py-2 rounded-xl font-bold flex items-center gap-1 ${
+                isNextDisabled
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-[#D4AF37] text-gray-900 hover:shadow-lg'
+              }`}
             >
-              <X className="w-6 h-6" />
+              {isNextDisabled ? <Lock className="w-4 h-4" /> : isLast ? 'إنهاء' : 'التالي'}
             </button>
           </div>
-          <p className="text-base text-gray-700 font-sans leading-relaxed">
-            {step.description}
-          </p>
-          <div className="flex items-center justify-between mt-5">
-            <span className="text-sm text-gray-500 font-sans">
-              {currentStep + 1} / {tourSteps.length}
-            </span>
-            <div className="flex gap-2">
-              {currentStep > 0 && (
-                <button
-                  onClick={prevStep}
-                  className="px-4 py-2 rounded-xl bg-gray-200 text-gray-800 hover:bg-gray-300 transition-colors font-sans flex items-center gap-1"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                  السابق
-                </button>
-              )}
-              <button
-                onClick={nextStep}
-                className="px-5 py-2 rounded-xl bg-[#D4AF37] text-gray-900 font-bold hover:shadow-lg hover:shadow-[#D4AF37]/40 transition-all font-sans flex items-center gap-1"
-              >
-                {isLast ? 'إنهاء' : 'التالي'}
-                {!isLast && <ChevronLeft className="w-5 h-5" />}
-              </button>
-            </div>
-          </div>
-        </motion.div>
+        </div>
       </motion.div>
-    </AnimatePresence>
+    </motion.div>
   )
 }

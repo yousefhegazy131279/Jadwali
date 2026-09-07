@@ -1,180 +1,179 @@
 'use client'
 
 import { useState } from 'react'
-import { useSupabase } from '@/lib/supabaseProvider'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Mail, CheckCircle, AlertCircle } from 'lucide-react'
+import { useSupabase } from '@/lib/supabaseProvider'
+import { toast } from 'sonner'
+import { Loader2, UserPlus, Mail, Lock, User, Globe } from 'lucide-react'
+import Link from 'next/link'
+import { Logo } from '@/components/Logo'
 
 export default function SignupPage() {
+  const router = useRouter()
+  const { supabase } = useSupabase()
+  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
-  const [resendLoading, setResendLoading] = useState(false)
-  const { supabase } = useSupabase()
-  const router = useRouter()
+  const [googleLoading, setGoogleLoading] = useState(false)
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!fullName.trim() || !email.trim() || !password.trim()) {
+      toast.error('أكمل جميع الحقول')
+      return
+    }
+    if (password.length < 6) {
+      toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل')
+      return
+    }
+
     setLoading(true)
-    setError('')
-
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
       password,
-     // داخل دالة handleSignup، في options:
-options: {
-    emailRedirectTo: `${window.location.origin}/auth/callback`,
-  },
-    })
-
-    if (signUpError) {
-      setError(signUpError.message)
-      setLoading(false)
-      return
-    }
-
-    // إذا كان المستخدم موجوداً بالفعل (ولكن غير مؤكد)
-    if (data?.user && data.user.identities?.length === 0) {
-      setError('هذا البريد الإلكتروني مستخدم بالفعل. يرجى تسجيل الدخول أو استعادة كلمة المرور.')
-      setLoading(false)
-      return
-    }
-
-    // نجاح التسجيل
-    setSuccess(true)
-    setLoading(false)
-
-    // حفظ البريد في حالة الرغبة في إعادة إرسال التأكيد
-    // نترك للمستخدم خيار إعادة الإرسال
-  }
-
-  const handleResendConfirmation = async () => {
-    if (!email) return
-    setResendLoading(true)
-    const { error } = await supabase.auth.resend({
-      type: 'signup',
-      email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/login?confirmed=true`,
+        data: {
+          full_name: fullName.trim(),
+        },
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     })
+
     if (error) {
-      setError(error.message)
+      toast.error(error.message)
+      setLoading(false)
+    } else if (data.session) {
+      toast.success('تم إنشاء الحساب!')
+      router.push('/dashboard')
+      router.refresh()
     } else {
-      alert('تم إعادة إرسال رابط التأكيد إلى بريدك الإلكتروني.')
+      toast.success('تم إنشاء الحساب! تحقق من بريدك لتأكيده')
+      router.push('/auth/login')
     }
-    setResendLoading(false)
+  }
+
+  const handleGoogleSignup = async () => {
+    setGoogleLoading(true)
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
+
+    if (error) {
+      toast.error('حدث خطأ أثناء الاتصال بجوجل')
+      console.error(error)
+      setGoogleLoading(false)
+    }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0b1a2e] p-4">
+    <div className="min-h-screen flex items-center justify-center p-4 relative">
       <motion.div
-        initial={{ opacity: 0, y: 30 }}
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="bg-white/5 backdrop-blur-md p-8 rounded-2xl border border-white/10 w-full max-w-md shadow-2xl"
+        className="w-full max-w-md bg-[var(--bg-card)] backdrop-blur-xl rounded-2xl border border-[var(--border-color)] p-8 shadow-2xl"
       >
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-[#D4AF37]">جَدْوَلِي</h1>
-          <p className="text-gray-400 mt-2">ابدأ رحلة التنظيم</p>
+          <div className="w-20 h-20 mx-auto mb-4">
+            <Logo />
+          </div>
+          <h1 className="text-3xl font-bold font-['Amiri'] text-[var(--text-primary)]">
+            إنشاء حساب
+          </h1>
+          <p className="text-[var(--text-secondary)] font-['Cairo'] mt-2">
+            انضم إلى جَدْوَلِي وابدأ رحلتك
+          </p>
         </div>
 
-        {success ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="space-y-4"
-          >
-            <div className="text-center text-green-400 bg-green-500/10 p-4 rounded-xl">
-              <Mail className="w-8 h-8 mx-auto mb-2" />
-              <p className="font-bold">تم إنشاء الحساب!</p>
-              <p className="text-sm text-gray-400 mt-1">
-                تم إرسال رابط تأكيد إلى بريدك الإلكتروني.
-                <br />
-                يرجى فتح البريد والنقر على الرابط لتأكيد حسابك.
-              </p>
-            </div>
+        {/* زر Google */}
+        <button
+          onClick={handleGoogleSignup}
+          disabled={googleLoading}
+          className="w-full py-3 rounded-xl bg-white text-gray-800 font-bold font-['Cairo'] flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50 transition-colors mb-4 disabled:opacity-50"
+        >
+          {googleLoading ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            <Globe className="w-5 h-5 text-blue-500" />
+          )}
+          المتابعة باستخدام Google
+        </button>
 
-            <div className="flex gap-2">
-              <button
-                onClick={handleResendConfirmation}
-                disabled={resendLoading}
-                className="flex-1 bg-white/10 text-white py-2 rounded-xl font-medium hover:bg-white/20 transition disabled:opacity-50"
-              >
-                {resendLoading ? 'جاري...' : 'إعادة إرسال رابط التأكيد'}
-              </button>
-              <Link
-                href="/auth/login"
-                className="flex-1 bg-[#D4AF37] text-[#0b1a2e] py-2 rounded-xl font-bold text-center hover:shadow-lg transition"
-              >
-                تسجيل الدخول
-              </Link>
+        <div className="flex items-center gap-3 my-6">
+          <div className="flex-1 h-px bg-[var(--border-color)]" />
+          <span className="text-[var(--text-muted)] font-['Cairo'] text-sm">أو</span>
+          <div className="flex-1 h-px bg-[var(--border-color)]" />
+        </div>
+
+        <form onSubmit={handleSignup} className="space-y-4">
+          <div>
+            <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-2">
+              الاسم الكامل
+            </label>
+            <div className="relative">
+              <User className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="w-full pr-10 pl-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#D4AF37] transition-all font-['Cairo']"
+                placeholder="اسمك الكامل"
+                required
+              />
             </div>
-          </motion.div>
-        ) : (
-          <form onSubmit={handleSignup} className="space-y-4">
-            <div>
+          </div>
+
+          <div>
+            <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-2">
+              البريد الإلكتروني
+            </label>
+            <div className="relative">
+              <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
               <input
                 type="email"
-                placeholder="البريد الإلكتروني"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full p-3 rounded-xl bg-white/10 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:border-[#D4AF37] transition"
+                className="w-full pr-10 pl-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#D4AF37] transition-all font-['Cairo']"
+                placeholder="example@email.com"
                 required
               />
             </div>
-            <div>
+          </div>
+
+          <div>
+            <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-2">
+              كلمة المرور
+            </label>
+            <div className="relative">
+              <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
               <input
                 type="password"
-                placeholder="كلمة المرور (6 أحرف على الأقل)"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full p-3 rounded-xl bg-white/10 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:border-[#D4AF37] transition"
+                className="w-full pr-10 pl-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#D4AF37] transition-all font-['Cairo']"
+                placeholder="••••••••"
                 required
-                minLength={6}
               />
             </div>
+          </div>
 
-            {error && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-red-400 text-sm text-center bg-red-500/10 p-2 rounded-lg flex items-center gap-2 justify-center"
-              >
-                <AlertCircle className="w-4 h-4" />
-                {error}
-              </motion.div>
-            )}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 rounded-xl bg-[#D4AF37] text-[#0b1a2e] font-bold hover:shadow-lg hover:shadow-[#D4AF37]/30 transition-all font-['Cairo'] flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus className="w-5 h-5" />}
+            إنشاء الحساب
+          </button>
+        </form>
 
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              type="submit"
-              disabled={loading}
-              className="w-full bg-[#D4AF37] text-[#0b1a2e] py-3 rounded-xl font-bold hover:shadow-lg transition disabled:opacity-50"
-            >
-              {loading ? (
-                <div className="flex items-center justify-center gap-2">
-                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-[#0b1a2e] border-t-transparent" />
-                  جاري...
-                </div>
-              ) : (
-                'إنشاء حساب'
-              )}
-            </motion.button>
-
-            <p className="text-center text-xs text-gray-500">
-              ستصلك رسالة تأكيد على بريدك الإلكتروني
-            </p>
-          </form>
-        )}
-
-        <p className="text-center text-gray-400 mt-6">
-          لديك حساب؟{' '}
+        <p className="text-center text-[var(--text-secondary)] font-['Cairo'] text-sm mt-6">
+          لديك حساب بالفعل؟{' '}
           <Link href="/auth/login" className="text-[#D4AF37] hover:underline">
             تسجيل الدخول
           </Link>

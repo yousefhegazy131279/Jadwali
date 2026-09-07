@@ -16,6 +16,7 @@ import {
   CheckCircle,
   AlertCircle,
   Settings as SettingsIcon,
+  User,
 } from 'lucide-react'
 import AOS from 'aos'
 import 'aos/dist/aos.css'
@@ -40,7 +41,7 @@ type Settings = {
 const PRAYER_NAMES = ['الفجر', 'الظهر', 'العصر', 'المغرب', 'العشاء']
 
 export default function SettingsPage() {
-  const { user } = useSupabase()
+  const { user, fullName, updateFullName } = useSupabase()
   const { theme, toggleTheme } = useTheme()
   const [settings, setSettings] = useState<Settings | null>(null)
   const [loading, setLoading] = useState(true)
@@ -54,10 +55,31 @@ export default function SettingsPage() {
     longBreak: 30,
   })
 
+  // حالة تغيير الاسم
+  const [name, setName] = useState(fullName || '')
+  const [savingName, setSavingName] = useState(false)
+
+  // حالة وضع التركيز
+  const [focusMode, setFocusMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('focusMode') === 'true'
+    }
+    return false
+  })
+
   useEffect(() => {
     AOS.init({ duration: 600, easing: 'ease-out-cubic', once: true, mirror: true })
     if (user) fetchSettings()
   }, [user])
+
+  useEffect(() => {
+    setName(fullName || '')
+  }, [fullName])
+
+  useEffect(() => {
+    localStorage.setItem('focusMode', String(focusMode))
+    document.documentElement.classList.toggle('focus-mode', focusMode)
+  }, [focusMode])
 
   const fetchSettings = async () => {
     if (!user) return
@@ -105,7 +127,6 @@ export default function SettingsPage() {
   const handleSave = async () => {
     if (!user || !settings) return
 
-    // تحقق من صحة القيم
     if (pomodoro.sessionDuration < 1 || pomodoro.sessionDuration > 120) {
       toast.error('مدة الجلسة يجب أن تكون بين 1 و 120 دقيقة')
       return
@@ -165,6 +186,16 @@ export default function SettingsPage() {
 
   const updatePomodoro = (key: keyof typeof pomodoro, value: number) => {
     setPomodoro({ ...pomodoro, [key]: value })
+  }
+
+  const handleSaveName = async () => {
+    if (!name.trim()) {
+      toast.error('الاسم لا يمكن أن يكون فارغًا')
+      return
+    }
+    setSavingName(true)
+    await updateFullName(name.trim())
+    setSavingName(false)
   }
 
   if (loading) {
@@ -240,6 +271,44 @@ export default function SettingsPage() {
 
       {/* ===== بطاقات الإعدادات ===== */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* ===== تغيير الاسم ===== */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="bg-[var(--bg-card)] backdrop-blur-xl rounded-2xl border border-[var(--border-color)] p-5 sm:p-6 shadow-lg hover:shadow-xl transition-shadow"
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 rounded-xl bg-[#D4AF37]/10 text-[#D4AF37]">
+              <User className="w-5 h-5" />
+            </div>
+            <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">الاسم الشخصي</h2>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-1">
+                الاسم الحالي
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-4 py-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:border-[#D4AF37] transition-all font-['Cairo']"
+                placeholder="أدخل اسمك"
+              />
+            </div>
+            <button
+              onClick={handleSaveName}
+              disabled={savingName}
+              className="w-full py-2.5 rounded-xl bg-[#D4AF37] text-[#0b1a2e] font-bold hover:shadow-lg hover:shadow-[#D4AF37]/30 transition-all font-['Cairo'] flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {savingName ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              حفظ الاسم
+            </button>
+          </div>
+        </motion.div>
+
         {/* ===== المظهر ===== */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -270,20 +339,46 @@ export default function SettingsPage() {
             </div>
 
             <button
-              onClick={toggleTheme}
-              className="w-full py-3 rounded-xl bg-[#D4AF37]/10 text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-colors font-['Cairo'] flex items-center justify-center gap-2 border border-[#D4AF37]/30"
+  onClick={toggleTheme}
+  data-tour="toggle-theme"  // ✅ إضافة هذه السمة
+  className="w-full py-3 rounded-xl bg-[#D4AF37]/10 text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-colors font-['Cairo'] flex items-center justify-center gap-2 border border-[#D4AF37]/30"
+>
+  {theme === 'dark' ? (
+    <>
+      <Sun className="w-5 h-5" />
+      تبديل إلى الوضع الفاتح
+    </>
+  ) : (
+    <>
+      <Moon className="w-5 h-5" />
+      تبديل إلى الوضع الداكن
+    </>
+  )}
+</button>
+          </div>
+        </motion.div>
+
+        {/* ===== وضع التركيز ===== */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="bg-[var(--bg-card)] backdrop-blur-xl rounded-2xl border border-[var(--border-color)] p-5 sm:p-6 shadow-lg hover:shadow-xl transition-shadow"
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 rounded-xl bg-[#D4AF37]/10 text-[#D4AF37]">
+              <Zap className="w-5 h-5" />
+            </div>
+            <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">وضع التركيز</h2>
+          </div>
+
+          <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)]">
+            <span className="text-[var(--text-secondary)] font-['Cairo']">تقليل التشتت</span>
+            <button
+              onClick={() => setFocusMode(!focusMode)}
+              className={`relative w-12 h-6 rounded-full transition-colors ${focusMode ? 'bg-emerald-500' : 'bg-gray-400'}`}
             >
-              {theme === 'dark' ? (
-                <>
-                  <Sun className="w-5 h-5" />
-                  تبديل إلى الوضع الفاتح
-                </>
-              ) : (
-                <>
-                  <Moon className="w-5 h-5" />
-                  تبديل إلى الوضع الداكن
-                </>
-              )}
+              <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${focusMode ? 'right-0.5' : 'right-6'}`} />
             </button>
           </div>
         </motion.div>

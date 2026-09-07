@@ -1,130 +1,115 @@
 'use client'
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-} from 'react'
-
-import type {
-  Session,
-  User,
-} from '@supabase/supabase-js'
-
 import { createClient } from '@/lib/supabase/client'
+import { createContext, useContext, useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
-// ============================================================
-//  إضافة fullName إلى السياق
-// ============================================================
 type SupabaseContextType = {
   supabase: ReturnType<typeof createClient>
-  session: Session | null
-  user: User | null
-  isLoading: boolean
+  user: any | null
   fullName: string | null
-  setFullName: (name: string) => Promise<void>
+  isAdmin: boolean | null
+  updateFullName: (name: string) => Promise<void>
 }
 
-const SupabaseContext = createContext<SupabaseContextType | null>(null)
+const SupabaseContext = createContext<SupabaseContextType | undefined>(undefined)
 
-export function SupabaseProvider({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const [supabase] = useState(() => createClient())
-
-  const [session, setSession] = useState<Session | null>(null)
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [fullName, setFullNameState] = useState<string | null>(null)
-
-  // ============================================================
-  //  تحديث الاسم من user_metadata
-  // ============================================================
-  const updateFullName = (user: User | null) => {
-    if (user?.user_metadata?.full_name) {
-      setFullNameState(user.user_metadata.full_name)
-    } else if (user?.email) {
-      setFullNameState(user.email.split('@')[0])
-    } else {
-      setFullNameState('مستخدم')
-    }
-  }
+  const [user, setUser] = useState<any | null>(null)
+  const [fullName, setFullName] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
 
   useEffect(() => {
-    let mounted = true
+    const fetchUser = async () => {
+      const { data } = await supabase.auth.getUser()
+      const u = data.user
+      setUser(u)
 
-    async function loadSession() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      // ابدأ من user_metadata
+      let name = u?.user_metadata?.full_name || u?.user_metadata?.name || null
 
-      if (!mounted) return
+      if (u) {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('role, full_name')
+          .eq('id', u.id)
+          .single()
 
-      setSession(session)
-      setUser(session?.user ?? null)
-      updateFullName(session?.user ?? null)
-      setIsLoading(false)
+        if (!error && profile) {
+          setIsAdmin(profile.role === 'admin')
+          // استخدم الاسم من profiles إذا كان متوفرًا
+          if (profile.full_name) name = profile.full_name
+        } else {
+          setIsAdmin(false)
+        }
+      } else {
+        setIsAdmin(false)
+      }
+
+      setFullName(name)
     }
 
-    loadSession()
+    fetchUser()
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session)
-        setUser(session?.user ?? null)
-        updateFullName(session?.user ?? null)
-        setIsLoading(false)
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const u = session?.user ?? null
+      setUser(u)
+
+      let name = u?.user_metadata?.full_name || u?.user_metadata?.name || null
+
+      if (u) {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('role, full_name')
+          .eq('id', u.id)
+          .single()
+
+        if (!error && profile) {
+          setIsAdmin(profile.role === 'admin')
+          if (profile.full_name) name = profile.full_name
+        } else {
+          setIsAdmin(false)
+        }
+      } else {
+        setIsAdmin(false)
       }
-    )
+
+      setFullName(name)
+    })
 
     return () => {
-      mounted = false
-      subscription.unsubscribe()
+      authListener.subscription.unsubscribe()
     }
   }, [supabase])
 
-  // ============================================================
-  //  دالة تحديث اسم المستخدم في Supabase
-  // ============================================================
-  const setFullName = async (name: string) => {
+  const updateFullName = async (name: string) => {
     if (!user) return
 
-    const { error } = await supabase.auth.updateUser({
-      data: { full_name: name },
+    // 1) تحديث user_metadata في auth.users
+    const { error: authError } = await supabase.auth.updateUser({
+      data: { full_name: name, name: name },
     })
 
-    if (!error) {
-      setFullNameState(name)
-      // تحديث user محلياً
-      setUser({
-        ...user,
-        user_metadata: {
-          ...user.user_metadata,
-          full_name: name,
-        },
-      })
+    // 2) تحديث أو إنشاء سجل في جدول profiles
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert(
+        { id: user.id, email: user.email, full_name: name },
+        { onConflict: 'id' }
+      )
+
+    if (!authError && !profileError) {
+      setFullName(name)
+      toast.success('تم حفظ الاسم بنجاح')
     } else {
-      console.error('Error updating full name:', error)
-      throw error
+      toast.error('حدث خطأ في حفظ الاسم')
+      console.error('authError:', authError, 'profileError:', profileError)
     }
   }
 
   return (
-    <SupabaseContext.Provider
-      value={{
-        supabase,
-        session,
-        user,
-        isLoading,
-        fullName,
-        setFullName,
-      }}
-    >
+    <SupabaseContext.Provider value={{ supabase, user, fullName, isAdmin, updateFullName }}>
       {children}
     </SupabaseContext.Provider>
   )
@@ -132,12 +117,6 @@ export function SupabaseProvider({
 
 export function useSupabase() {
   const context = useContext(SupabaseContext)
-
-  if (!context) {
-    throw new Error(
-      'useSupabase must be used within SupabaseProvider'
-    )
-  }
-
+  if (!context) throw new Error('useSupabase must be used within SupabaseProvider')
   return context
 }

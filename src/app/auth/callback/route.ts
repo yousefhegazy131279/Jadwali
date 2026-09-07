@@ -1,44 +1,19 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: Request) {
-  const requestUrl = new URL(request.url)
+  const { searchParams, origin } = new URL(request.url)
+  const code = searchParams.get('code')
+  const next = searchParams.get('next') ?? '/dashboard'
 
-  const code = requestUrl.searchParams.get('code')
-
-  if (!code) {
-    return NextResponse.redirect(
-      new URL('/auth/login?error=no_code', request.url)
-    )
-  }
-
-  try {
+  if (code) {
     const supabase = await createClient()
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
 
-    const { error } =
-      await supabase.auth.exchangeCodeForSession(code)
-
-    if (error) {
-      console.error('CALLBACK ERROR:', error)
-
-      return NextResponse.redirect(
-        new URL(
-          '/auth/login?error=confirmation_failed',
-          request.url
-        )
-      )
+    if (!error) {
+      return NextResponse.redirect(`${origin}${next}`)
     }
-
-    console.log('CALLBACK SUCCESS')
-
-    return NextResponse.redirect(
-      new URL('/dashboard', request.url)
-    )
-  } catch (error) {
-    console.error('CALLBACK UNEXPECTED ERROR:', error)
-
-    return NextResponse.redirect(
-      new URL('/auth/login?error=unexpected', request.url)
-    )
   }
+
+  return NextResponse.redirect(`${origin}/auth/login?error=auth`)
 }

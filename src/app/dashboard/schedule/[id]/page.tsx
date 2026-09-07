@@ -1,11 +1,3 @@
-// src/app/(dashboard)/schedule/[id]/page.tsx
-// ============================================================
-//  النسخة النهائية - جدول ID مع مؤقت يعمل في الصفحة فقط
-//  تم إصلاح مشكلة عدم عرض الجلسات المنجزة
-//  تم إضافة أزرار إيقاف مؤقت واستئناف متزامنة مع لوحة التحكم
-//  تم إضافة زر إيقاف مؤقت في الهيدر لسهولة الوصول
-//  تم إضافة تحديث تلقائي لـ completed_sessions عند انتهاء المرحلة تلقائيًا
-// ============================================================
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
@@ -42,7 +34,6 @@ import {
 import { format } from 'date-fns'
 import { ar } from 'date-fns/locale'
 
-// ==================== Types ====================
 type Schedule = {
   id: string
   user_id: string
@@ -89,7 +80,6 @@ type CustomCard = {
   schedule_id: string
   title: string
   items: string[]
-  color: string
   created_at: string
 }
 
@@ -105,9 +95,6 @@ type Phase = {
   prayerName?: string
 }
 
-// ============================================================
-//  صوت التنبيه
-// ============================================================
 function playAlertSound() {
   try {
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
@@ -136,9 +123,6 @@ function playAlertSound() {
   } catch (_) {}
 }
 
-// ============================================================
-//  مكون الجلسة
-// ============================================================
 function PhaseItem({
   phase,
   index,
@@ -339,9 +323,6 @@ function PhaseItem({
   )
 }
 
-// ============================================================
-//  المكونات المساعدة
-// ============================================================
 function SideTaskItem({ task, onToggle }: { task: Task; onToggle: (id: string) => void }) {
   return (
     <motion.div
@@ -370,18 +351,31 @@ function SideTaskItem({ task, onToggle }: { task: Task; onToggle: (id: string) =
 }
 
 function CustomCardItem({ card, onDelete }: { card: CustomCard; onDelete: (id: string) => void }) {
+  const [completedItems, setCompletedItems] = useState<Set<number>>(new Set())
+
+  const toggleItem = (index: number) => {
+    setCompletedItems(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(index)) {
+        newSet.delete(index)
+      } else {
+        newSet.add(index)
+      }
+      return newSet
+    })
+  }
+
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      className="relative p-4 rounded-xl border-2 bg-[var(--bg-card)] shadow-lg"
-      style={{ borderColor: card.color }}
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      whileHover={{ x: 4 }}
+      className="flex flex-col gap-2 p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[#D4AF37]/30 transition-all duration-300"
     >
-      <div className="flex items-center justify-between mb-2">
-        <h4 className="font-bold text-[var(--text-primary)] font-['Amiri']" style={{ color: card.color }}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-bold text-[var(--text-primary)] font-['Cairo']">
           {card.title}
-        </h4>
+        </span>
         <motion.button
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
@@ -391,27 +385,33 @@ function CustomCardItem({ card, onDelete }: { card: CustomCard; onDelete: (id: s
           <X className="w-4 h-4" />
         </motion.button>
       </div>
-      <ul className="space-y-1">
-        {card.items.map((item, i) => (
-          <motion.li
-            key={i}
-            initial={{ opacity: 0, x: -5 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.05 }}
-            className="text-sm text-[var(--text-secondary)] font-['Cairo'] flex items-center gap-2"
+      <ul className="space-y-1.5">
+        {card.items.map((item, index) => (
+          <li
+            key={index}
+            className="flex items-center gap-2 cursor-pointer"
+            onClick={() => toggleItem(index)}
           >
-            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: card.color }} />
-            {item}
-          </motion.li>
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleItem(index) }}
+              className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                completedItems.has(index)
+                  ? 'bg-emerald-500 border-emerald-500'
+                  : 'border-[var(--text-muted)] hover:border-[#D4AF37]'
+              }`}
+            >
+              {completedItems.has(index) && <Check className="w-3 h-3 text-white" />}
+            </button>
+            <span className={`text-sm transition-all ${completedItems.has(index) ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-primary)]'} font-['Cairo']`}>
+              {item}
+            </span>
+          </li>
         ))}
       </ul>
     </motion.div>
   )
 }
 
-// ============================================================
-//  مودالات
-// ============================================================
 function AddSideTaskModal({
   isOpen,
   onClose,
@@ -484,18 +484,16 @@ function AddCardModal({
 }: {
   isOpen: boolean
   onClose: () => void
-  onSave: (title: string, items: string[], color: string) => Promise<void>
+  onSave: (title: string, items: string[]) => Promise<void>
   isLoading: boolean
 }) {
   const [title, setTitle] = useState('')
   const [items, setItems] = useState<string[]>([''])
-  const [color, setColor] = useState('#D4AF37')
 
   useEffect(() => {
     if (!isOpen) {
       setTitle('')
       setItems([''])
-      setColor('#D4AF37')
     }
   }, [isOpen])
 
@@ -521,10 +519,8 @@ function AddCardModal({
       toast.error('أضف عنصراً واحداً على الأقل')
       return
     }
-    await onSave(title.trim(), filteredItems, color)
+    await onSave(title.trim(), filteredItems)
   }
-
-  const colors = ['#D4AF37', '#F44336', '#E91E63', '#9C27B0', '#3F51B5', '#2196F3', '#009688', '#4CAF50', '#FF9800', '#795548']
 
   if (!isOpen) return null
 
@@ -537,7 +533,7 @@ function AddCardModal({
         className="bg-[var(--bg-card)] backdrop-blur-xl border border-[var(--border-color)] rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto"
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">إضافة كارد مخصص</h2>
+          <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">إضافة كارد</h2>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10 text-[var(--text-secondary)] hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
@@ -591,23 +587,6 @@ function AddCardModal({
             )}
           </div>
 
-          <div>
-            <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-1">اللون</label>
-            <div className="flex flex-wrap gap-2">
-              {colors.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setColor(c)}
-                  className={`w-8 h-8 rounded-full border-2 transition-all duration-300 ${
-                    color === c ? 'border-white scale-110 shadow-lg' : 'border-transparent hover:scale-110'
-                  }`}
-                  style={{ backgroundColor: c }}
-                />
-              ))}
-            </div>
-          </div>
-
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -624,9 +603,6 @@ function AddCardModal({
   )
 }
 
-// ============================================================
-//  الصفحة الرئيسية للجدول المخصص
-// ============================================================
 export default function ScheduleDetailPage() {
   const { id } = useParams()
   const router = useRouter()
@@ -659,9 +635,8 @@ export default function ScheduleDetailPage() {
   const today = new Date().toISOString().split('T')[0]
 
   const prevPhaseIndexRef = useRef<number | null>(null)
-  const lastProcessedCompletedRef = useRef<number>(0) // لتتبع آخر completedPhases تمت معالجته
+  const lastProcessedCompletedRef = useRef<number>(0)
 
-  // ===== تهيئة AOS والساعة =====
   useEffect(() => {
     AOS.init({ duration: 600, easing: 'ease-out-cubic', once: true, mirror: true })
     const interval = setInterval(() => setCurrentTime(new Date()), 1000)
@@ -669,7 +644,6 @@ export default function ScheduleDetailPage() {
     return () => clearInterval(interval)
   }, [user, id])
 
-  // ===== إخفاء الفلوتنج تايمر =====
   useEffect(() => {
     setTimerVisibility(false)
     return () => {
@@ -677,7 +651,6 @@ export default function ScheduleDetailPage() {
     }
   }, [])
 
-  // ===== مزامنة الحالة مع سياق المؤقت =====
   useEffect(() => {
     if (timerState.scheduleId === id) {
       setCurrentPhaseIndex(timerState.currentPhaseIndex)
@@ -688,7 +661,6 @@ export default function ScheduleDetailPage() {
     }
   }, [timerState, id])
 
-  // ===== جلب البيانات وتوليد المراحل =====
   const fetchData = async () => {
     if (!user || !id) return
     const supabase = createClient()
@@ -817,7 +789,6 @@ export default function ScheduleDetailPage() {
 
     setPhases(newPhases)
 
-    // حساب الجلسات المكتملة مسبقًا
     let initialCompleted = 0
     const taskSessionCounters: Record<string, number> = {}
     newPhases.forEach((phase) => {
@@ -835,19 +806,15 @@ export default function ScheduleDetailPage() {
     })
     setCompletedCount(initialCompleted)
     setCurrentPhaseIndex(null)
-    // إعادة تعيين عداد المعالجة
     lastProcessedCompletedRef.current = initialCompleted
   }
 
-  // ===== دالة تحديث تقدم المهمة في قاعدة البيانات =====
   const updateTaskProgress = useCallback(async (taskId: string) => {
     if (!taskId) return
     const supabase = createClient()
     try {
-      // محاولة استخدام RPC (يجب أن تكون معرّفة في Supabase)
       const { error } = await supabase.rpc('increment_completed_sessions', { task_id: taskId })
       if (error) {
-        // fallback: قراءة القيمة الحالية وزيادتها
         const { data: task, error: fetchError } = await supabase
           .from('tasks')
           .select('completed_sessions')
@@ -870,14 +837,12 @@ export default function ScheduleDetailPage() {
     }
   }, [])
 
-  // ===== تأثير لمراقبة اكتمال المراحل تلقائيًا =====
   useEffect(() => {
     if (timerState.scheduleId !== id) return
     const currentCompleted = timerState.completedPhases || 0
     const lastProcessed = lastProcessedCompletedRef.current
 
     if (currentCompleted > lastProcessed && phases.length > 0) {
-      // معالجة كل مرحلة اكتملت حديثًا
       for (let i = lastProcessed; i < currentCompleted; i++) {
         const completedPhase = phases[i]
         if (completedPhase && completedPhase.type === 'work' && completedPhase.taskId) {
@@ -888,7 +853,6 @@ export default function ScheduleDetailPage() {
     }
   }, [timerState.completedPhases, timerState.scheduleId, id, phases, updateTaskProgress])
 
-  // ===== بدء الجلسة =====
   const handleStartPhase = (index: number) => {
     if (currentPhaseIndex !== null && currentPhaseIndex !== index) {
       toast.error('يجب إنهاء الجلسة الحالية أولاً')
@@ -901,7 +865,6 @@ export default function ScheduleDetailPage() {
     toast.success(`🎯 بدأت ${phase.type === 'work' ? `جلسة ${phase.sessionNumber}` : phase.type === 'shortBreak' ? 'راحة قصيرة' : 'راحة طويلة'}`)
   }
 
-  // ===== إنهاء الجلسة (يدوياً) =====
   const handleCompletePhase = (index: number) => {
     if (currentPhaseIndex !== index) return
     if (timerState.timeLeft > 0) {
@@ -917,7 +880,6 @@ export default function ScheduleDetailPage() {
     toast.success(`✅ تم إنهاء المرحلة رقم ${index + 1}`)
   }
 
-  // ===== بقية الوظائف =====
   const handleToggleSideTask = async (taskId: string) => {
     const task = tasks.find(t => t.id === taskId)
     if (!task) return
@@ -959,38 +921,40 @@ export default function ScheduleDetailPage() {
     }
     setIsSaving(false)
   }
+// في src/app/(dashboard)/schedule/[id]/page.tsx
 
-  const handleAddCard = async (title: string, items: string[], color: string) => {
-    if (!user || !schedule) return
-    setIsSaving(true)
-    const supabase = createClient()
-    const { data, error } = await supabase.from('custom_cards').insert({
+// تعديل handleAddCard بحيث لا تُنشئ مهامًا إضافية إطلاقًا
+const handleAddCard = async (title: string, items: string[], color?: string) => {
+  if (!user || !schedule) return
+  setIsSaving(true)
+  const supabase = createClient()
+
+  // إدراج الكارد فقط بدون أي مهام
+  const { data, error } = await supabase
+    .from('custom_cards')
+    .insert({
       user_id: user.id,
       schedule_id: schedule.id,
       title,
       items,
-      color,
-    }).select().single()
-    if (error) toast.error('حدث خطأ في إضافة الكارد')
-    else {
-      setCustomCards([...customCards, data])
-      toast.success('✅ تم إضافة الكارد')
-      setIsAddCardModalOpen(false)
-      const tasksToInsert = items.map(item => ({
-        user_id: user.id,
-        schedule_id: schedule.id,
-        name: item,
-        category: title,
-        duration: 0,
-        type: 'task',
-        priority: 'medium',
-        done: false,
-        completed_sessions: 0,
-      }))
-      await supabase.from('tasks').insert(tasksToInsert)
-    }
-    setIsSaving(false)
+      // ملاحظة: قد تحتاج للتأكد أن العمود color موجود في الجدول
+      // إذا لم يكن موجودًا، احذف السطر التالي
+      // color: color || '#D4AF37',
+    })
+    .select()
+    .single()
+
+  if (error) {
+    toast.error('حدث خطأ في إضافة الكارد')
+    console.error(error)
+  } else {
+    setCustomCards([...customCards, data])
+    toast.success('✅ تم إضافة الكارد')
+    setIsAddCardModalOpen(false)
   }
+
+  setIsSaving(false)
+}
 
   const handleDeleteCard = async (cardId: string) => {
     if (!confirm('هل أنت متأكد من حذف هذا الكارد؟')) return
@@ -1038,7 +1002,6 @@ export default function ScheduleDetailPage() {
 
   return (
     <div className="p-6 space-y-6" dir="rtl">
-      {/* الهيدر */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -1084,7 +1047,6 @@ export default function ScheduleDetailPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* زر إيقاف مؤقت / استئناف في الهيدر */}
           {isTimerActive && timerState.scheduleId === id && (
             isTimerPaused ? (
               <motion.button
@@ -1140,7 +1102,6 @@ export default function ScheduleDetailPage() {
         </div>
       </motion.div>
 
-      {/* شريط التقدم */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -1163,9 +1124,7 @@ export default function ScheduleDetailPage() {
         </div>
       </motion.div>
 
-      {/* المحتوى الثلاثي */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* العمود الأيسر: الأعمال الجانبية والكاردات */}
         <div className="lg:col-span-3 space-y-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -1201,26 +1160,14 @@ export default function ScheduleDetailPage() {
           </motion.div>
 
           {customCards.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="bg-[var(--bg-card)] backdrop-blur-xl rounded-2xl border border-[var(--border-color)] p-5 shadow-lg"
-            >
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="w-5 h-5 text-[#D4AF37]" />
-                <h2 className="text-lg font-bold text-[var(--text-primary)] font-['Amiri']">كاردات مخصصة</h2>
-              </div>
-              <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
-                {customCards.map(card => (
-                  <CustomCardItem key={card.id} card={card} onDelete={handleDeleteCard} />
-                ))}
-              </div>
-            </motion.div>
+            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+              {customCards.map(card => (
+                <CustomCardItem key={card.id} card={card} onDelete={handleDeleteCard} />
+              ))}
+            </div>
           )}
         </div>
 
-        {/* العمود الأوسط: الجلسات */}
         <div className="lg:col-span-6 space-y-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -1282,7 +1229,6 @@ export default function ScheduleDetailPage() {
           </motion.div>
         </div>
 
-        {/* العمود الأيمن: الصلوات */}
         <div className="lg:col-span-3 space-y-4">
           {showPrayers && prayers.length > 0 && (
             <motion.div
@@ -1343,7 +1289,6 @@ export default function ScheduleDetailPage() {
         </div>
       </div>
 
-      {/* مودالات */}
       <AddSideTaskModal
         isOpen={isAddSideTaskModalOpen}
         onClose={() => setIsAddSideTaskModalOpen(false)}

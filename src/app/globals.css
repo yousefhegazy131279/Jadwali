@@ -44,3 +44,8 @@ body {
   background: var(--gold);
   border-radius: 10px;
 }
+/* وضع التركيز: إخفاء العناصر المشتتة */
+.focus-mode .neon-particles,
+.focus-mode footer {
+  display: none !important;
+}

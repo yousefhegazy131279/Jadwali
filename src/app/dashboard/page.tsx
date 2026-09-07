@@ -555,16 +555,18 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              {/* زر كيفية عمل الموقع */}
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={startTour}
-                className="p-2.5 rounded-xl bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[#D4AF37] transition-all duration-300 shadow-md hover:shadow-lg border border-[var(--border-color)]"
-                title="كيف يعمل الموقع؟"
-              >
-                <HelpCircle className="w-5 h-5" />
-              </motion.button>
+   {/* زر الجولة التعريفية */}
+<motion.button
+  whileHover={{ scale: 1.05, y: -2 }}
+  whileTap={{ scale: 0.95 }}
+  onClick={startTour}
+  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#E8C84A] text-[#0b1a2e] font-bold shadow-lg hover:shadow-xl hover:shadow-[#D4AF37]/40 transition-all duration-300 font-['Cairo'] text-sm border border-[#D4AF37]/50"
+  title="بدء جولة تعريفية تشرح طريقة عمل الموقع خطوة بخطوة"
+>
+  <HelpCircle className="w-5 h-5" />
+  <span className="hidden sm:inline">جولة تعريفية</span>
+  <span className="sm:hidden">جولة</span>
+</motion.button>
 
               {/* Notifications */}
               <div className="relative z-[100]" ref={notificationRef}>
@@ -820,12 +822,13 @@ export default function DashboardPage() {
                 )}
               </div>
               <button
-                onClick={() => router.push('/dashboard/planner')}
-                className="mt-3 w-full py-2 rounded-xl bg-[#D4AF37]/10 text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-colors font-['Cairo'] border border-[#D4AF37]/30 flex items-center justify-center gap-2 text-sm"
-              >
-                <Plus className="w-4 h-4" />
-                أضف جدولاً جديداً
-              </button>
+  data-tour="dashboard-add-schedule"
+  onClick={() => router.push('/dashboard/planner')}
+  className="mt-3 w-full py-2 rounded-xl bg-[#D4AF37]/10 text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-colors font-['Cairo'] border border-[#D4AF37]/30 flex items-center justify-center gap-2 text-sm"
+>
+  <Plus className="w-4 h-4" />
+  أضف جدولاً جديداً
+</button>
             </motion.div>
           </div>
         </div>

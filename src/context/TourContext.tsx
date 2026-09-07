@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { tourSteps } from '@/lib/tourSteps'
 
 type TourContextType = {
@@ -11,52 +11,111 @@ type TourContextType = {
   nextStep: () => void
   prevStep: () => void
   skipTour: () => void
-  endTour: () => void
+  markActionDone: () => void
+  isActionDone: boolean
 }
 
 const TourContext = createContext<TourContextType | undefined>(undefined)
 
 export function TourProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
+  const [isActionDone, setIsActionDone] = useState(false)
 
-  // التنقل عند تغيّر الخطوة (خارج نطاق التحديث)
+  // التوجيه عند تغيّر الخطوة
   useEffect(() => {
-    if (isOpen && tourSteps[currentStep]) {
+    if (isOpen && tourSteps[currentStep] && !tourSteps[currentStep].skipNavigation) {
       router.push(tourSteps[currentStep].path)
     }
+    if (isOpen && currentStep >= tourSteps.length) {
+      setIsOpen(false)
+    }
   }, [currentStep, isOpen, router])
+
+  // الانتقال التلقائي عند الوصول لمسار كامل
+  useEffect(() => {
+    if (!isOpen) return
+    const step = tourSteps[currentStep]
+    if (step?.autoNextPath && pathname === step.autoNextPath) {
+      const timer = setTimeout(() => {
+        setCurrentStep(prev => Math.min(prev + 1, tourSteps.length))
+        setIsActionDone(false)
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [pathname, isOpen, currentStep])
+
+  // الانتقال التلقائي عند الوصول لبادئة مسار
+  useEffect(() => {
+    if (!isOpen) return
+    const step = tourSteps[currentStep]
+    if (step?.autoNextPathPrefix && pathname.startsWith(step.autoNextPathPrefix)) {
+      const timer = setTimeout(() => {
+        setCurrentStep(prev => Math.min(prev + 1, tourSteps.length))
+        setIsActionDone(false)
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [pathname, isOpen, currentStep])
 
   const startTour = () => {
     setCurrentStep(0)
     setIsOpen(true)
+    setIsActionDone(false)
   }
 
-  const nextStep = () => {
-    if (currentStep === tourSteps.length - 1) {
-      endTour()
-    } else {
-      setCurrentStep(prev => prev + 1)
+  const nextStep = useCallback(() => {
+    const step = tourSteps[currentStep]
+    if (step?.required && !isActionDone) {
+      return
     }
-  }
+    setCurrentStep(prev => Math.min(prev + 1, tourSteps.length))
+    setIsActionDone(false)
+  }, [currentStep, isActionDone])
 
-  const prevStep = () => {
+  const prevStep = useCallback(() => {
     setCurrentStep(prev => Math.max(0, prev - 1))
-  }
+    setIsActionDone(false)
+  }, [])
 
   const skipTour = () => {
     setIsOpen(false)
     setCurrentStep(0)
+    setIsActionDone(false)
   }
 
-  const endTour = () => {
-    setIsOpen(false)
-    setCurrentStep(0)
+  const markActionDone = () => {
+    setIsActionDone(true)
   }
+
+  // مراقبة تفاعل المستخدم مع العنصر المستهدف
+  useEffect(() => {
+    if (!isOpen) return
+    const step = tourSteps[currentStep]
+    if (!step || step.action === 'wait' || !step.actionTarget) return
+
+    const eventType = step.action === 'click' ? 'click' : step.action === 'input' ? 'input' : 'change'
+
+    const handleAction = (e: Event) => {
+      const targetEl = e.target as HTMLElement
+      if (targetEl.closest(step.actionTarget!)) {
+        markActionDone()
+      }
+    }
+
+    document.addEventListener(eventType, handleAction, true)
+
+    return () => {
+      document.removeEventListener(eventType, handleAction, true)
+    }
+  }, [isOpen, currentStep, markActionDone])
 
   return (
-    <TourContext.Provider value={{ isOpen, currentStep, startTour, nextStep, prevStep, skipTour, endTour }}>
+    <TourContext.Provider
+      value={{ isOpen, currentStep, startTour, nextStep, prevStep, skipTour, markActionDone, isActionDone }}
+    >
       {children}
     </TourContext.Provider>
   )

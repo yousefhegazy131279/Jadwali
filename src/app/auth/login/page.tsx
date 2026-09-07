@@ -1,111 +1,160 @@
 'use client'
 
-import { FormEvent, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
+import { useSupabase } from '@/lib/supabaseProvider'
+import { toast } from 'sonner'
+import { Loader2, LogIn, Mail, Lock, Globe } from 'lucide-react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { Logo } from '@/components/Logo'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { supabase } = useSupabase()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [googleLoading, setGoogleLoading] = useState(false)
 
-  async function handleLogin(e: FormEvent<HTMLFormElement>) {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (!email.trim() || !password.trim()) {
+      toast.error('أدخل البريد الإلكتروني وكلمة المرور')
+      return
+    }
+
     setLoading(true)
-    setError('')
 
-    const supabase = createClient()
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
       password,
     })
 
     if (error) {
-      console.error('LOGIN ERROR:', error)
-
-      setError(error.message)
+      toast.error(
+        error.message === 'Invalid login credentials'
+          ? 'بيانات الدخول غير صحيحة'
+          : error.message
+      )
       setLoading(false)
-
-      return
+    } else {
+      toast.success('تم تسجيل الدخول بنجاح')
+      router.push('/dashboard')
+      router.refresh()
     }
+  }
 
-    console.log('LOGIN SUCCESS:', data.user?.email)
+  const handleGoogleLogin = async () => {
+    setGoogleLoading(true)
 
-    /*
-     * مهم:
-     * signInWithPassword مع createBrowserClient
-     * سيحفظ الـ session بالطريقة المناسبة.
-     *
-     * بعد ذلك نعمل refresh للـ Router
-     * حتى يقرأ السيرفر الـ cookies الجديدة.
-     */
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: 'http://localhost:3000/auth/callback'      },
+    })
 
-    router.replace('/dashboard')
-    router.refresh()
+    if (error) {
+      toast.error('حدث خطأ أثناء الاتصال بجوجل')
+      console.error(error)
+      setGoogleLoading(false)
+    }
   }
 
   return (
-    <main
-      dir="rtl"
-      className="min-h-screen flex items-center justify-center bg-[#0b1a2e] p-4"
-    >
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
-        <h1 className="mb-8 text-center text-3xl font-bold text-[#D4AF37]">
-          جَدْوَلِي
-        </h1>
+    <div className="min-h-screen flex items-center justify-center p-4 relative bg-[var(--bg-primary)]">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-md bg-[var(--bg-card)] backdrop-blur-xl rounded-2xl border border-[var(--border-color)] p-8 shadow-2xl"
+      >
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 mx-auto mb-4">
+            <Logo />
+          </div>
+          <h1 className="text-3xl font-bold font-['Amiri'] text-[var(--text-primary)]">
+            تسجيل الدخول
+          </h1>
+          <p className="text-[var(--text-secondary)] font-['Cairo'] mt-2">
+            مرحباً بعودتك إلى جَدْوَلِي
+          </p>
+        </div>
+
+        {/* زر جوجل */}
+        <button
+          onClick={handleGoogleLogin}
+          disabled={googleLoading}
+          className="w-full py-3 rounded-xl bg-white text-gray-800 font-bold font-['Cairo'] flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50 transition-colors mb-4 disabled:opacity-50"
+        >
+          {googleLoading ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            <Globe className="w-5 h-5 text-blue-500" />
+          )}
+          المتابعة باستخدام Google
+        </button>
+
+        <div className="flex items-center gap-3 my-6">
+          <div className="flex-1 h-px bg-[var(--border-color)]" />
+          <span className="text-[var(--text-muted)] font-['Cairo'] text-sm">أو</span>
+          <div className="flex-1 h-px bg-[var(--border-color)]" />
+        </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
-          <input
-            type="email"
-            placeholder="البريد الإلكتروني"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-            className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white placeholder:text-white/40 outline-none focus:border-[#D4AF37]"
-          />
+          <div>
+            <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-2">
+              البريد الإلكتروني
+            </label>
+            <div className="relative">
+              <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full pr-10 pl-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#D4AF37] transition-all font-['Cairo']"
+                placeholder="example@email.com"
+                required
+              />
+            </div>
+          </div>
 
-          <input
-            type="password"
-            placeholder="كلمة المرور"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            autoComplete="current-password"
-            className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white placeholder:text-white/40 outline-none focus:border-[#D4AF37]"
-          />
-
-          {error && (
-            <p className="text-center text-sm text-red-400">
-              {error}
-            </p>
-          )}
+          <div>
+            <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-2">
+              كلمة المرور
+            </label>
+            <div className="relative">
+              <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full pr-10 pl-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#D4AF37] transition-all font-['Cairo']"
+                placeholder="••••••••"
+                required
+              />
+            </div>
+          </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-[#D4AF37] py-3 font-bold text-[#0b1a2e] transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full py-3 rounded-xl bg-[#D4AF37] text-[#0b1a2e] font-bold hover:shadow-lg hover:shadow-[#D4AF37]/30 transition-all font-['Cairo'] flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            {loading ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول'}
+            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogIn className="w-5 h-5" />}
+            تسجيل الدخول
           </button>
         </form>
 
-        <p className="mt-5 text-center text-sm text-gray-400">
+        <p className="text-center text-[var(--text-secondary)] font-['Cairo'] text-sm mt-6">
           ليس لديك حساب؟{' '}
-          <Link
-            href="/auth/signup"
-            className="text-[#D4AF37] hover:underline"
-          >
-            أنشئ حسابًا
+          <Link href="/auth/signup" className="text-[#D4AF37] hover:underline">
+            أنشئ حساباً
           </Link>
         </p>
-      </div>
-    </main>
+      </motion.div>
+    </div>
   )
 }
