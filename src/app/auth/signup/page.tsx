@@ -37,7 +37,7 @@ export default function SignupPage() {
         data: {
           full_name: fullName.trim(),
         },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: 'https://jadwaly-hgz.vercel.app/auth/callback',
       },
     })
 
@@ -59,7 +59,7 @@ export default function SignupPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: 'https://jadwaly-hgz.vercel.app/auth/callback',
       },
     })
 
