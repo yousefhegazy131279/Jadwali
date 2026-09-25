@@ -1,6 +1,6 @@
 'use client'
 import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useLayoutEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useTour } from '@/context/TourContext'
 import { tourSteps } from '@/lib/tourSteps'
@@ -26,6 +26,8 @@ export default function TourOverlay() {
   const [position, setPosition] = useState<{ top: number; left: number; width: number; height: number } | null>(null)
   const [fallback, setFallback] = useState(false)
   const [placement, setPlacement] = useState<'top' | 'bottom' | 'center'>('top')
+  const [safeCardStyle, setSafeCardStyle] = useState<React.CSSProperties>({})
+  const cardRef = useRef<HTMLDivElement>(null)
 
   // ✅ فحص مبكر: إذا كانت الجولة مغلقة أو الخطوة غير موجودة، لا نعرض شيئًا
   const step = isOpen ? tourSteps[currentStep] : undefined
@@ -76,6 +78,17 @@ export default function TourOverlay() {
       return () => target.classList.remove('tour-highlight')
     }
   }, [isOpen, step])
+
+  // قياس البطاقة نفسها ثم حصرها داخل الشاشة؛ موضع العنصر وحده لا يكفي
+  // عندما يكون العنصر قريبًا من حافة الشاشة.
+  useLayoutEffect(() => {
+    if (!isOpen || !cardRef.current || window.innerWidth < 768) return
+    const rect = cardRef.current.getBoundingClientRect()
+    const gap = 12
+    const left = Math.max(gap, Math.min(rect.left, window.innerWidth - rect.width - gap))
+    const top = Math.max(gap, Math.min(rect.top, window.innerHeight - rect.height - gap))
+    setSafeCardStyle({ left, top, transform: 'none' })
+  }, [isOpen, currentStep, position, placement])
 
   // ✅ إذا كانت الجولة مغلقة أو لا توجد خطوة، لا نعرض الطبقة
   if (!isOpen || !step) return null
@@ -129,8 +142,9 @@ export default function TourOverlay() {
         role="dialog"
         aria-modal="false"
         aria-label={tr(step.title)}
+        ref={cardRef}
         className="absolute z-10 pointer-events-auto bg-white text-gray-900 border border-gray-300 rounded-2xl p-4 sm:p-6 shadow-2xl max-w-md w-[90%] md:w-96 max-md:!left-3 max-md:!right-3 max-md:!top-auto max-md:!bottom-4 max-md:!w-auto max-md:!max-w-none max-md:!translate-x-0 max-md:!translate-y-0"
-        style={cardStyle}
+        style={{ ...cardStyle, ...safeCardStyle }}
       >
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-bold text-xl">{tr(step.title)}</h3>
