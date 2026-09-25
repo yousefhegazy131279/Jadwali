@@ -29,8 +29,12 @@ const navItems = [
   { href: '/dashboard/planner', icon: Calendar, label: 'المخطط' },
   { href: '/dashboard/schedule', icon: Clock, label: 'الجدول' },
   { href: '/dashboard/workspace', icon: FolderOpen, label: 'المهام' },
+  { href: '/dashboard/projects', icon: FolderOpen, label: 'المشاريع' },
+  { href: '/dashboard/shared', icon: User, label: 'المشترك' },
+  { href: '/dashboard/analytics', icon: LayoutDashboard, label: 'الإحصائيات' },
   { href: '/dashboard/settings', icon: Settings, label: 'الإعدادات' },
 ]
+
 
 export const Sidebar = memo(function Sidebar() {
   const pathname = usePathname()
@@ -40,8 +44,11 @@ export const Sidebar = memo(function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
-    const saved = localStorage.getItem('sidebar-collapsed')
-    if (saved === 'true') setIsCollapsed(true)
+    try {
+      setIsCollapsed(localStorage.getItem('sidebar-collapsed') === 'true')
+    } catch {
+      setIsCollapsed(false)
+    }
   }, [])
 
   useEffect(() => {
@@ -51,7 +58,11 @@ export const Sidebar = memo(function Sidebar() {
   const toggleSidebar = () => {
     const newState = !isCollapsed
     setIsCollapsed(newState)
-    localStorage.setItem('sidebar-collapsed', String(newState))
+    try {
+      localStorage.setItem('sidebar-collapsed', String(newState))
+    } catch {
+      // The sidebar remains usable when storage is unavailable.
+    }
   }
 
   const handleLogout = async () => {
@@ -70,6 +81,8 @@ export const Sidebar = memo(function Sidebar() {
       <button
         className="md:hidden fixed top-4 right-4 z-[1100] p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-lg backdrop-blur-xl"
         onClick={() => setMobileOpen(prev => !prev)}
+        type="button"
+        aria-expanded={mobileOpen}
         aria-label={mobileOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
       >
         {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -102,13 +115,14 @@ export const Sidebar = memo(function Sidebar() {
         `}
       >
         <div className="flex justify-end items-center mb-4 md:hidden">
-          <button onClick={() => setMobileOpen(false)} className="p-2 rounded-lg hover:bg-white/10">
+          <button type="button" onClick={() => setMobileOpen(false)} className="p-2 rounded-lg hover:bg-white/10">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="hidden md:flex justify-end mb-4">
           <button
+            type="button"
             onClick={toggleSidebar}
             className="p-2 rounded-lg hover:bg-white/10 text-[var(--text-secondary)] hover:text-[#D4AF37]"
           >
@@ -163,6 +177,7 @@ export const Sidebar = memo(function Sidebar() {
 
         <div className="border-t border-[var(--border-color)] pt-4 space-y-2">
           <button
+            type="button"
             onClick={toggleTheme}
             className={`flex items-center gap-3 w-full px-4 py-2.5 rounded-xl bg-[var(--bg-card-hover)] ${
               isCollapsed && !mobileOpen ? 'md:justify-center' : ''
@@ -180,6 +195,7 @@ export const Sidebar = memo(function Sidebar() {
           )}
 
           <button
+            type="button"
             onClick={handleLogout}
             className={`flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-red-400 hover:bg-red-500/10 ${
               isCollapsed && !mobileOpen ? 'md:justify-center' : ''
