@@ -1,0 +1,23 @@
+{
+  "name": "Jadwali — Plan your day",
+  "short_name": "Jadwali",
+  "description": "Daily planning and focus",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b1a2e",
+  "theme_color": "#D4AF37",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "lang": "en",
+  "dir": "ltr"
+}

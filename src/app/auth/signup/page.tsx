@@ -1,5 +1,5 @@
 'use client'
-
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
@@ -10,6 +10,8 @@ import Link from 'next/link'
 import { Logo } from '@/components/Logo'
 
 export default function SignupPage() {
+  const { t: tr, language } = useLanguage()
+
   const router = useRouter()
   const { supabase } = useSupabase()
   const [fullName, setFullName] = useState('')
@@ -21,11 +23,11 @@ export default function SignupPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!fullName.trim() || !email.trim() || !password.trim()) {
-      toast.error('أكمل جميع الحقول')
+      toast.error(tr('أكمل جميع الحقول'))
       return
     }
     if (password.length < 6) {
-      toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل')
+      toast.error(tr('كلمة المرور يجب أن تكون 6 أحرف على الأقل'))
       return
     }
 
@@ -45,11 +47,11 @@ export default function SignupPage() {
       toast.error(error.message)
       setLoading(false)
     } else if (data.session) {
-      toast.success('تم إنشاء الحساب!')
+      toast.success(tr('تم إنشاء الحساب!'))
       router.push('/dashboard')
       router.refresh()
     } else {
-      toast.success('تم إنشاء الحساب! تحقق من بريدك لتأكيده')
+      toast.success(tr('تم إنشاء الحساب! تحقق من بريدك لتأكيده'))
       router.push('/auth/login')
     }
   }
@@ -64,7 +66,7 @@ export default function SignupPage() {
     })
 
     if (error) {
-      toast.error('حدث خطأ أثناء الاتصال بجوجل')
+      toast.error(tr('حدث خطأ أثناء الاتصال بجوجل'))
       console.error(error)
       setGoogleLoading(false)
     }
@@ -83,11 +85,9 @@ export default function SignupPage() {
             <Logo />
           </div>
           <h1 className="text-3xl font-bold font-['Amiri'] text-[var(--text-primary)]">
-            إنشاء حساب
-          </h1>
+            {tr(" إنشاء حساب ")}</h1>
           <p className="text-[var(--text-secondary)] font-['Cairo'] mt-2">
-            انضم إلى جَدْوَلِي وابدأ رحلتك
-          </p>
+            {tr(" انضم إلى جَدْوَلِي وابدأ رحلتك ")}</p>
         </div>
 
         {/* زر Google */}
@@ -101,20 +101,18 @@ export default function SignupPage() {
           ) : (
             <Globe className="w-5 h-5 text-blue-500" />
           )}
-          المتابعة باستخدام Google
-        </button>
+          {tr(" المتابعة باستخدام Google ")}</button>
 
         <div className="flex items-center gap-3 my-6">
           <div className="flex-1 h-px bg-[var(--border-color)]" />
-          <span className="text-[var(--text-muted)] font-['Cairo'] text-sm">أو</span>
+          <span className="text-[var(--text-muted)] font-['Cairo'] text-sm">{tr("أو")}</span>
           <div className="flex-1 h-px bg-[var(--border-color)]" />
         </div>
 
         <form onSubmit={handleSignup} className="space-y-4">
           <div>
             <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-2">
-              الاسم الكامل
-            </label>
+              {tr(" الاسم الكامل ")}</label>
             <div className="relative">
               <User className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
               <input
@@ -122,7 +120,7 @@ export default function SignupPage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="w-full pr-10 pl-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#D4AF37] transition-all font-['Cairo']"
-                placeholder="اسمك الكامل"
+                placeholder={tr("اسمك الكامل")}
                 required
               />
             </div>
@@ -130,8 +128,7 @@ export default function SignupPage() {
 
           <div>
             <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-2">
-              البريد الإلكتروني
-            </label>
+              {tr(" البريد الإلكتروني ")}</label>
             <div className="relative">
               <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
               <input
@@ -147,8 +144,7 @@ export default function SignupPage() {
 
           <div>
             <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-2">
-              كلمة المرور
-            </label>
+              {tr(" كلمة المرور ")}</label>
             <div className="relative">
               <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
               <input
@@ -168,15 +164,13 @@ export default function SignupPage() {
             className="w-full py-3 rounded-xl bg-[#D4AF37] text-[#0b1a2e] font-bold hover:shadow-lg hover:shadow-[#D4AF37]/30 transition-all font-['Cairo'] flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus className="w-5 h-5" />}
-            إنشاء الحساب
-          </button>
+            {tr(" إنشاء الحساب ")}</button>
         </form>
 
         <p className="text-center text-[var(--text-secondary)] font-['Cairo'] text-sm mt-6">
-          لديك حساب بالفعل؟{' '}
+          {tr(" لديك حساب بالفعل؟")}{' '}
           <Link href="/auth/login" className="text-[#D4AF37] hover:underline">
-            تسجيل الدخول
-          </Link>
+            {tr(" تسجيل الدخول ")}</Link>
         </p>
       </motion.div>
     </div>

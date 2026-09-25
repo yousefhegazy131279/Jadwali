@@ -1,4 +1,5 @@
 import './globals.css'
+import { LanguageProvider } from '@/context/LanguageContext'
 import { SupabaseProvider } from '@/lib/supabaseProvider'
 import { ThemeProvider } from '@/context/ThemeContext'
 import { Cairo, Amiri } from 'next/font/google'
@@ -23,14 +24,15 @@ const amiri = Amiri({
 
 export const metadata = {
   title: 'جَدْوَلِي',
-  description: 'خطط يومك، أنجز مهامك، عش حياتك.',
+  description: 'جَدْوَلِي — Jadwali: Plan your day and focus on what matters.',
   manifest: '/manifest.json',
-  themeColor: '#D4AF37',
   icons: {
     icon: '/logo.png',
     apple: '/logo.png',
   },
 }
+
+export const viewport = { themeColor: '#D4AF37' }
 
 export default function RootLayout({
   children,
@@ -44,7 +46,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/logo.png" />
       </head>
       <body>
-        <TourProvider>
+        <LanguageProvider><TourProvider>
           <SupabaseProvider>
             <ThemeProvider>
               <BodyWrapper>
@@ -54,7 +56,7 @@ export default function RootLayout({
             </ThemeProvider>
           </SupabaseProvider>
           <TourOverlay />
-        </TourProvider>
+        </TourProvider></LanguageProvider>
         <PWAProvider />
       </body>
     </html>

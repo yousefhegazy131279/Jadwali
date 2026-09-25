@@ -1,5 +1,6 @@
 'use client'
-
+import { formatTime12 } from '@/lib/time'
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
@@ -21,6 +22,7 @@ import {
 import AOS from 'aos'
 import 'aos/dist/aos.css'
 import { toast } from 'sonner'
+import { isTime, normalizePrayerTimes } from '@/lib/preferences'
 import { useTheme } from '@/context/ThemeContext'
 
 type Settings = {
@@ -41,6 +43,8 @@ type Settings = {
 const PRAYER_NAMES = ['الفجر', 'الظهر', 'العصر', 'المغرب', 'العشاء']
 
 export default function SettingsPage() {
+  const { t: tr, language } = useLanguage()
+
   const { user, fullName, updateFullName } = useSupabase()
   const { theme, toggleTheme } = useTheme()
   const [settings, setSettings] = useState<Settings | null>(null)
@@ -92,11 +96,11 @@ export default function SettingsPage() {
       .single()
 
     if (error && error.code !== 'PGRST116') {
-      toast.error('حدث خطأ في تحميل الإعدادات')
+      toast.error(tr('حدث خطأ في تحميل الإعدادات'))
       console.error(error)
     } else if (data) {
       setSettings(data)
-      setPrayerTimes(data.prayer_times || ['04:25', '13:02', '16:38', '19:57', '21:26'])
+      setPrayerTimes(normalizePrayerTimes(data.prayer_times))
       setPomodoro(data.pomodoro || { sessionDuration: 50, shortBreak: 10, cyclesBeforeLong: 4, longBreak: 30 })
     } else {
       const defaultSettings = {
@@ -113,7 +117,7 @@ export default function SettingsPage() {
         .single()
 
       if (insertError) {
-        toast.error('حدث خطأ في إنشاء الإعدادات')
+        toast.error(tr('حدث خطأ في إنشاء الإعدادات'))
         console.error(insertError)
       } else {
         setSettings(newData)
@@ -128,22 +132,23 @@ export default function SettingsPage() {
     if (!user || !settings) return
 
     if (pomodoro.sessionDuration < 1 || pomodoro.sessionDuration > 120) {
-      toast.error('مدة الجلسة يجب أن تكون بين 1 و 120 دقيقة')
+      toast.error(tr('مدة الجلسة يجب أن تكون بين 1 و 120 دقيقة'))
       return
     }
     if (pomodoro.shortBreak < 1 || pomodoro.shortBreak > 30) {
-      toast.error('الراحة القصيرة يجب أن تكون بين 1 و 30 دقيقة')
+      toast.error(tr('الراحة القصيرة يجب أن تكون بين 1 و 30 دقيقة'))
       return
     }
     if (pomodoro.longBreak < 1 || pomodoro.longBreak > 60) {
-      toast.error('الراحة الطويلة يجب أن تكون بين 1 و 60 دقيقة')
+      toast.error(tr('الراحة الطويلة يجب أن تكون بين 1 و 60 دقيقة'))
       return
     }
     if (pomodoro.cyclesBeforeLong < 1 || pomodoro.cyclesBeforeLong > 10) {
-      toast.error('عدد الدورات يجب أن يكون بين 1 و 10')
+      toast.error(tr('عدد الدورات يجب أن يكون بين 1 و 10'))
       return
     }
 
+    if (prayerTimes.length !== 5 || !prayerTimes.every(isTime)) { toast.error(tr('أدخل مواقيت صلاة صحيحة')); return }
     setSaving(true)
     const supabase = createClient()
 
@@ -153,17 +158,20 @@ export default function SettingsPage() {
       updated_at: new Date().toISOString(),
     }
 
-    const { error } = await supabase
+    const { data: saved, error } = await supabase
       .from('settings')
       .update(updated)
       .eq('id', settings.id)
+      .eq('user_id', user.id)
+      .select()
+      .single()
 
     if (error) {
-      toast.error('حدث خطأ في حفظ الإعدادات')
+      toast.error(tr('حدث خطأ في حفظ الإعدادات'))
       console.error(error)
     } else {
-      setSettings({ ...settings, ...updated })
-      toast.success('✅ تم حفظ الإعدادات بنجاح')
+      setSettings(saved)
+      toast.success(tr('✅ تم حفظ الإعدادات بنجاح'))
       setJustSaved(true)
       setTimeout(() => setJustSaved(false), 2000)
     }
@@ -171,11 +179,11 @@ export default function SettingsPage() {
   }
 
   const handleReset = () => {
-    if (!confirm('هل أنت متأكد من إعادة الإعدادات إلى القيم الافتراضية؟')) return
+    if (!confirm(tr('هل أنت متأكد من إعادة الإعدادات إلى القيم الافتراضية؟'))) return
 
     setPrayerTimes(['04:25', '13:02', '16:38', '19:57', '21:26'])
     setPomodoro({ sessionDuration: 50, shortBreak: 10, cyclesBeforeLong: 4, longBreak: 30 })
-    toast.info('تم إعادة الإعدادات إلى القيم الافتراضية')
+    toast.info(tr('تم إعادة الإعدادات إلى القيم الافتراضية'))
   }
 
   const updatePrayerTime = (index: number, value: string) => {
@@ -190,12 +198,11 @@ export default function SettingsPage() {
 
   const handleSaveName = async () => {
     if (!name.trim()) {
-      toast.error('الاسم لا يمكن أن يكون فارغًا')
+      toast.error(tr('الاسم لا يمكن أن يكون فارغًا'))
       return
     }
     setSavingName(true)
-    await updateFullName(name.trim())
-    setSavingName(false)
+    try { await updateFullName(name.trim()) } catch { toast.error(tr('تعذر حفظ الاسم', 'Could not save your name')) } finally { setSavingName(false) }
   }
 
   if (loading) {
@@ -211,7 +218,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6" dir="rtl">
+    <div className="p-4 sm:p-6 space-y-6" >
       {/* ===== الهيدر ===== */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -221,11 +228,9 @@ export default function SettingsPage() {
       >
         <div>
           <h1 className="text-3xl sm:text-4xl font-bold font-['Amiri'] text-[var(--text-primary)]">
-            الإعدادات
-          </h1>
+            {tr(" الإعدادات ")}</h1>
           <p className="text-[var(--text-secondary)] text-sm font-['Cairo'] mt-1">
-            خصص تجربتك في جَدْوَلِي
-          </p>
+            {tr(" خصص تجربتك في جَدْوَلِي ")}</p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -234,11 +239,10 @@ export default function SettingsPage() {
             whileTap={{ scale: 0.98 }}
             onClick={fetchSettings}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 text-[var(--text-secondary)] hover:bg-white/10 transition-colors font-['Cairo'] border border-[var(--border-color)]"
-            title="إعادة تحميل الإعدادات"
+            title={tr("إعادة تحميل الإعدادات")}
           >
             <RefreshCw className="w-4 h-4" />
-            تحديث
-          </motion.button>
+            {tr(" تحديث ")}</motion.button>
 
           <motion.button
             whileHover={{ scale: 1.02 }}
@@ -247,8 +251,7 @@ export default function SettingsPage() {
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 text-[var(--text-secondary)] hover:bg-white/10 transition-colors font-['Cairo'] border border-[var(--border-color)]"
           >
             <RefreshCw className="w-4 h-4" />
-            إعادة ضبط
-          </motion.button>
+            {tr(" إعادة ضبط ")}</motion.button>
 
           <motion.button
             whileHover={{ scale: 1.02 }}
@@ -264,7 +267,7 @@ export default function SettingsPage() {
             ) : (
               <Save className="w-5 h-5" />
             )}
-            {justSaved ? 'تم الحفظ' : 'حفظ التغييرات'}
+            {justSaved ? tr('تم الحفظ') : tr('حفظ التغييرات')}
           </motion.button>
         </div>
       </motion.div>
@@ -282,20 +285,19 @@ export default function SettingsPage() {
             <div className="p-2 rounded-xl bg-[#D4AF37]/10 text-[#D4AF37]">
               <User className="w-5 h-5" />
             </div>
-            <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">الاسم الشخصي</h2>
+            <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">{tr("الاسم الشخصي")}</h2>
           </div>
 
           <div className="space-y-3">
             <div>
               <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-1">
-                الاسم الحالي
-              </label>
+                {tr(" الاسم الحالي ")}</label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full px-4 py-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:border-[#D4AF37] transition-all font-['Cairo']"
-                placeholder="أدخل اسمك"
+                placeholder={tr("أدخل اسمك")}
               />
             </div>
             <button
@@ -304,8 +306,7 @@ export default function SettingsPage() {
               className="w-full py-2.5 rounded-xl bg-[#D4AF37] text-[#0b1a2e] font-bold hover:shadow-lg hover:shadow-[#D4AF37]/30 transition-all font-['Cairo'] flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {savingName ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              حفظ الاسم
-            </button>
+              {tr(" حفظ الاسم ")}</button>
           </div>
         </motion.div>
 
@@ -320,12 +321,12 @@ export default function SettingsPage() {
             <div className="p-2 rounded-xl bg-[#D4AF37]/10 text-[#D4AF37]">
               <SettingsIcon className="w-5 h-5" />
             </div>
-            <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">المظهر</h2>
+            <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">{tr("المظهر")}</h2>
           </div>
 
           <div className="space-y-4">
             <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)]">
-              <span className="text-[var(--text-secondary)] font-['Cairo']">الوضع الحالي</span>
+              <span className="text-[var(--text-secondary)] font-['Cairo']">{tr("الوضع الحالي")}</span>
               <div className="flex items-center gap-2">
                 {theme === 'dark' ? (
                   <Moon className="w-5 h-5 text-[#D4AF37]" />
@@ -333,7 +334,7 @@ export default function SettingsPage() {
                   <Sun className="w-5 h-5 text-[#D4AF37]" />
                 )}
                 <span className="text-[var(--text-primary)] font-['Cairo'] font-medium">
-                  {theme === 'dark' ? 'داكن' : 'فاتح'}
+                  {theme === 'dark' ? tr('داكن') : tr('فاتح')}
                 </span>
               </div>
             </div>
@@ -346,13 +347,11 @@ export default function SettingsPage() {
   {theme === 'dark' ? (
     <>
       <Sun className="w-5 h-5" />
-      تبديل إلى الوضع الفاتح
-    </>
+      {tr(" تبديل إلى الوضع الفاتح ")}</>
   ) : (
     <>
       <Moon className="w-5 h-5" />
-      تبديل إلى الوضع الداكن
-    </>
+      {tr(" تبديل إلى الوضع الداكن ")}</>
   )}
 </button>
           </div>
@@ -369,11 +368,11 @@ export default function SettingsPage() {
             <div className="p-2 rounded-xl bg-[#D4AF37]/10 text-[#D4AF37]">
               <Zap className="w-5 h-5" />
             </div>
-            <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">وضع التركيز</h2>
+            <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">{tr("وضع التركيز")}</h2>
           </div>
 
           <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)]">
-            <span className="text-[var(--text-secondary)] font-['Cairo']">تقليل التشتت</span>
+            <span className="text-[var(--text-secondary)] font-['Cairo']">{tr("تقليل التشتت")}</span>
             <button
               onClick={() => setFocusMode(!focusMode)}
               className={`relative w-12 h-6 rounded-full transition-colors ${focusMode ? 'bg-emerald-500' : 'bg-gray-400'}`}
@@ -394,21 +393,23 @@ export default function SettingsPage() {
             <div className="p-2 rounded-xl bg-[#D4AF37]/10 text-[#D4AF37]">
               <Clock className="w-5 h-5" />
             </div>
-            <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">أوقات الصلاة</h2>
+            <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">{tr("أوقات الصلاة")}</h2>
           </div>
 
           <div className="space-y-3">
             {PRAYER_NAMES.map((name, index) => (
-              <div key={index} className="flex items-center gap-3">
+              <div key={index} className="flex flex-wrap items-center gap-3">
                 <label className="w-16 text-[var(--text-secondary)] font-['Cairo'] text-sm">
-                  {name}
+                  {tr(name)}
                 </label>
                 <input
                   type="time"
+                  aria-label={tr(name)}
                   value={prayerTimes[index] || ''}
                   onChange={(e) => updatePrayerTime(index, e.target.value)}
                   className="flex-1 px-4 py-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:border-[#D4AF37] transition-all duration-300 font-['Cairo']"
                 />
+                <span className="text-sm">{formatTime12(prayerTimes[index], language)}</span>
               </div>
             ))}
           </div>
@@ -425,14 +426,13 @@ export default function SettingsPage() {
             <div className="p-2 rounded-xl bg-[#D4AF37]/10 text-[#D4AF37]">
               <Zap className="w-5 h-5" />
             </div>
-            <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">إعدادات بومودورو</h2>
+            <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">{tr("إعدادات بومودورو")}</h2>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-2">
-                مدة الجلسة (دقيقة)
-              </label>
+                {tr(" مدة الجلسة (دقيقة) ")}</label>
               <input
                 type="number"
                 min="1"
@@ -444,8 +444,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-2">
-                راحة قصيرة (دقيقة)
-              </label>
+                {tr(" راحة قصيرة (دقيقة) ")}</label>
               <input
                 type="number"
                 min="1"
@@ -457,8 +456,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-2">
-                دورات قبل راحة طويلة
-              </label>
+                {tr(" دورات قبل راحة طويلة ")}</label>
               <input
                 type="number"
                 min="1"
@@ -470,8 +468,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-2">
-                راحة طويلة (دقيقة)
-              </label>
+                {tr(" راحة طويلة (دقيقة) ")}</label>
               <input
                 type="number"
                 min="1"

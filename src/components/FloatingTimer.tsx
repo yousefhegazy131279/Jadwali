@@ -1,8 +1,8 @@
+'use client'
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
 // ============================================================
 //  3. src/components/FloatingTimer.tsx
 // ============================================================
-'use client'
-
 import { useEffect, useState, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useTimer } from '@/context/TimerContext'
@@ -10,81 +10,14 @@ import { useRouter, usePathname } from 'next/navigation'
 import { Clock, Play, Pause, X, CheckCircle, Minus } from 'lucide-react'
 
 export function FloatingTimer() {
+  const { t: tr, language } = useLanguage()
+
   const { timerState, pauseTimer, resumeTimer, resetTimer, completePhase } = useTimer()
   const router = useRouter()
   const pathname = usePathname()
-  const [localTimeLeft, setLocalTimeLeft] = useState(timerState.timeLeft)
+  const localTimeLeft = timerState.timeLeft
   const [isMinimized, setIsMinimized] = useState(false)
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
-
-  const isOnScheduleDetail = pathname?.startsWith('/dashboard/schedule/') && pathname !== '/dashboard/schedule'
-
-  // مزامنة الوقت المحلي مع السياق
-  useEffect(() => {
-    setLocalTimeLeft(timerState.timeLeft)
-  }, [timerState.timeLeft])
-
-  // المؤقت الرئيسي - يعمل بشكل مستمر
-  useEffect(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-      intervalRef.current = null
-    }
-
-    if (timerState.isRunning && !timerState.isPaused && timerState.currentPhaseIndex !== null) {
-      intervalRef.current = setInterval(() => {
-        setLocalTimeLeft(prev => {
-          const newTime = prev - 1
-          if (newTime <= 0) {
-            if (intervalRef.current) {
-              clearInterval(intervalRef.current)
-              intervalRef.current = null
-            }
-            playAlertSound()
-            completePhase()
-            return 0
-          }
-          return newTime
-        })
-      }, 1000)
-    }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timerState.isRunning, timerState.isPaused, timerState.currentPhaseIndex])
-
-  const playAlertSound = () => {
-    try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.frequency.value = 880
-      osc.type = 'sine'
-      gain.gain.setValueAtTime(0.3, ctx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
-      osc.start(ctx.currentTime)
-      osc.stop(ctx.currentTime + 0.5)
-      setTimeout(() => {
-        const osc2 = ctx.createOscillator()
-        const gain2 = ctx.createGain()
-        osc2.connect(gain2)
-        gain2.connect(ctx.destination)
-        osc2.frequency.value = 1100
-        osc2.type = 'sine'
-        gain2.gain.setValueAtTime(0.25, ctx.currentTime)
-        gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
-        osc2.start(ctx.currentTime)
-        osc2.stop(ctx.currentTime + 0.4)
-      }, 200)
-    } catch (_) {}
-  }
+  const isOnScheduleDetail = pathname === '/dashboard/schedule/' + timerState.scheduleId
 
   if (!timerState.isVisible || timerState.currentPhaseIndex === null || isOnScheduleDetail) {
     return null
@@ -98,7 +31,7 @@ export function FloatingTimer() {
 
   const currentPhase = timerState.currentPhaseIndex !== null ? timerState.phases[timerState.currentPhaseIndex] : null
   const isWork = currentPhase?.type === 'work'
-  const label = isWork ? `جلسة ${timerState.sessionNumber}` : currentPhase?.type === 'shortBreak' ? 'راحة قصيرة' : 'راحة طويلة'
+  const label = isWork ? `${tr('جلسة', 'Session')} ${timerState.sessionNumber}` : currentPhase?.type === 'shortBreak' ? tr('راحة قصيرة') : tr('راحة طويلة')
 
   const handleClick = () => {
     if (timerState.scheduleId) {
@@ -117,7 +50,7 @@ export function FloatingTimer() {
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         exit={{ scale: 0 }}
-        className="fixed bottom-6 left-6 z-50 bg-[var(--bg-card)] backdrop-blur-xl border border-[#D4AF37] rounded-full shadow-2xl shadow-[#D4AF37]/20 cursor-pointer p-2"
+        className="fixed bottom-3 end-3 z-50 bg-[var(--bg-card)] backdrop-blur-xl border border-[#D4AF37] rounded-full shadow-2xl shadow-[#D4AF37]/20 cursor-pointer p-2"
         onClick={() => setIsMinimized(false)}
       >
         <div className="flex items-center gap-2 px-2">
@@ -139,7 +72,7 @@ export function FloatingTimer() {
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: 100, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-      className="fixed bottom-6 left-6 z-50 bg-[var(--bg-card)] backdrop-blur-xl border border-[#D4AF37] rounded-2xl shadow-2xl shadow-[#D4AF37]/20 hover:shadow-[#D4AF37]/40 transition-shadow cursor-pointer min-w-[220px] max-w-[300px]"
+      className="fixed bottom-6 left-6 z-50 bg-[var(--bg-card)] backdrop-blur-xl border border-[#D4AF37] rounded-2xl shadow-2xl shadow-[#D4AF37]/20 hover:shadow-[#D4AF37]/40 transition-shadow cursor-pointer min-w-[220px] max-w-[calc(100vw-1.5rem)] w-[280px]"
       onClick={handleClick}
     >
       <div className="p-4">
@@ -193,8 +126,7 @@ export function FloatingTimer() {
         {timerState.completedPhases > 0 && (
           <div className="mt-2 text-xs text-[var(--text-muted)] font-['Cairo'] flex items-center gap-1">
             <CheckCircle className="w-3 h-3 text-emerald-400" />
-            {timerState.completedPhases}/{timerState.totalPhases} مكتملة
-          </div>
+            {timerState.completedPhases}/{timerState.totalPhases} {tr(" مكتملة ")}</div>
         )}
         <div className="mt-2 h-0.5 bg-white/10 rounded-full overflow-hidden">
           <motion.div

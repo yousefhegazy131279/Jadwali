@@ -1,5 +1,5 @@
 'use client'
-
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
@@ -47,6 +47,8 @@ function NoteCard({
   onEdit: (note: Note) => void
   index: number
 }) {
+  const { t: tr, language } = useLanguage()
+
   const [isHovered, setIsHovered] = useState(false)
 
   const preview = note.content.length > 120 ? note.content.slice(0, 120) + '...' : note.content
@@ -91,7 +93,7 @@ function NoteCard({
               whileTap={{ scale: 0.9 }}
               onClick={() => onEdit(note)}
               className="p-1.5 rounded-lg hover:bg-white/10 text-[var(--text-secondary)] hover:text-[#D4AF37] transition-colors"
-              title="تعديل الملاحظة"
+              title={tr("تعديل الملاحظة")}
             >
               <Edit2 className="w-4 h-4" />
             </motion.button>
@@ -100,7 +102,7 @@ function NoteCard({
               whileTap={{ scale: 0.9 }}
               onClick={() => onDelete(note.id)}
               className="p-1.5 rounded-lg hover:bg-red-500/10 text-[var(--text-secondary)] hover:text-red-400 transition-colors"
-              title="حذف الملاحظة"
+              title={tr("حذف الملاحظة")}
             >
               <Trash2 className="w-4 h-4" />
             </motion.button>
@@ -114,18 +116,16 @@ function NoteCard({
               {preview}
             </p>
           ) : (
-            <p className="text-[var(--text-muted)] font-['Cairo'] italic">ملاحظة فارغة</p>
+            <p className="text-[var(--text-muted)] font-['Cairo'] italic">{tr("ملاحظة فارغة")}</p>
           )}
         </div>
 
         {/* عدد الكلمات */}
         <div className="mt-3 pt-3 border-t border-[var(--border-color)] flex items-center justify-between">
           <span className="text-xs text-[var(--text-muted)] font-['Cairo']">
-            {note.content.split(/\s+/).filter(Boolean).length} كلمة
-          </span>
+            {note.content.split(/\s+/).filter(Boolean).length} {tr(" كلمة ")}</span>
           <span className="text-xs text-[var(--text-muted)] font-['Cairo']">
-            {note.content.length} حرف
-          </span>
+            {note.content.length} {tr(" حرف ")}</span>
         </div>
       </div>
     </motion.div>
@@ -148,6 +148,8 @@ function NoteModal({
   editingNote?: Note | null
   isLoading: boolean
 }) {
+  const { t: tr, language } = useLanguage()
+
   const [content, setContent] = useState('')
 
   useEffect(() => {
@@ -161,7 +163,7 @@ function NoteModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (content.trim().length < 1) {
-      toast.error('الرجاء كتابة محتوى الملاحظة')
+      toast.error(tr('الرجاء كتابة محتوى الملاحظة'))
       return
     }
     await onSave(content.trim())
@@ -188,7 +190,7 @@ function NoteModal({
               )}
             </div>
             <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">
-              {editingNote ? 'تعديل الملاحظة' : 'ملاحظة جديدة'}
+              {editingNote ? tr('تعديل الملاحظة') : tr('ملاحظة جديدة')}
             </h2>
           </div>
           <button
@@ -202,20 +204,19 @@ function NoteModal({
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2 font-['Cairo']">
-              المحتوى
-            </label>
+              {tr(" المحتوى ")}</label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="اكتب ملاحظتك هنا..."
+              placeholder={tr("اكتب ملاحظتك هنا...")}
               rows={10}
               className="w-full px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#D4AF37] transition-all duration-300 font-['Cairo'] resize-none"
-              dir="rtl"
+
               autoFocus
             />
             <div className="flex justify-between mt-2 text-xs text-[var(--text-muted)] font-['Cairo']">
-              <span>{content.split(/\s+/).filter(Boolean).length} كلمة</span>
-              <span>{content.length} حرف</span>
+              <span>{content.split(/\s+/).filter(Boolean).length} {tr(" كلمة")}</span>
+              <span>{content.length} {tr(" حرف")}</span>
             </div>
           </div>
 
@@ -225,8 +226,7 @@ function NoteModal({
               onClick={onClose}
               className="flex-1 py-3 rounded-xl bg-white/5 text-[var(--text-secondary)] hover:bg-white/10 transition-colors font-['Cairo']"
             >
-              إلغاء
-            </button>
+              {tr(" إلغاء ")}</button>
             <button
               type="submit"
               disabled={isLoading || content.trim().length < 1}
@@ -237,7 +237,7 @@ function NoteModal({
               ) : (
                 <>
                   <Save className="w-5 h-5" />
-                  {editingNote ? 'تحديث' : 'حفظ'}
+                  {editingNote ? tr('تحديث') : tr('حفظ')}
                 </>
               )}
             </button>
@@ -252,6 +252,8 @@ function NoteModal({
 //  الصفحة الرئيسية للملاحظات
 // ============================================================
 export default function NotesPage() {
+  const { t: tr, language } = useLanguage()
+
   const { user } = useSupabase()
   const [notes, setNotes] = useState<Note[]>([])
   const [loading, setLoading] = useState(true)
@@ -283,7 +285,7 @@ export default function NotesPage() {
       .order('updated_at', { ascending: false })
 
     if (error) {
-      toast.error('حدث خطأ في تحميل الملاحظات')
+      toast.error(tr('حدث خطأ في تحميل الملاحظات'))
       console.error(error)
     } else {
       setNotes(data || [])
@@ -307,11 +309,11 @@ export default function NotesPage() {
       .single()
 
     if (error) {
-      toast.error('حدث خطأ في إضافة الملاحظة')
+      toast.error(tr('حدث خطأ في إضافة الملاحظة'))
       console.error(error)
     } else {
       setNotes([data, ...notes])
-      toast.success('✅ تم إضافة الملاحظة بنجاح')
+      toast.success(tr('✅ تم إضافة الملاحظة بنجاح'))
       setIsModalOpen(false)
     }
     setIsSaving(false)
@@ -334,11 +336,11 @@ export default function NotesPage() {
       .single()
 
     if (error) {
-      toast.error('حدث خطأ في تعديل الملاحظة')
+      toast.error(tr('حدث خطأ في تعديل الملاحظة'))
       console.error(error)
     } else {
       setNotes(notes.map((n) => (n.id === editingNote.id ? data : n)))
-      toast.success('✅ تم تعديل الملاحظة بنجاح')
+      toast.success(tr('✅ تم تعديل الملاحظة بنجاح'))
       setIsModalOpen(false)
       setEditingNote(null)
     }
@@ -346,17 +348,17 @@ export default function NotesPage() {
   }
 
   const handleDeleteNote = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذه الملاحظة؟')) return
+    if (!confirm(tr('هل أنت متأكد من حذف هذه الملاحظة؟'))) return
 
     const supabase = createClient()
     const { error } = await supabase.from('notes').delete().eq('id', id)
 
     if (error) {
-      toast.error('حدث خطأ في حذف الملاحظة')
+      toast.error(tr('حدث خطأ في حذف الملاحظة'))
       console.error(error)
     } else {
       setNotes(notes.filter((n) => n.id !== id))
-      toast.success('🗑️ تم حذف الملاحظة')
+      toast.success(tr('🗑️ تم حذف الملاحظة'))
     }
   }
 
@@ -391,7 +393,7 @@ export default function NotesPage() {
   }
 
   return (
-    <div className="p-6 space-y-6" dir="rtl">
+    <div className="p-6 space-y-6" >
       {/* ===== الهيدر ===== */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -401,12 +403,11 @@ export default function NotesPage() {
       >
         <div>
           <h1 className="text-3xl font-bold font-['Amiri'] text-[var(--text-primary)]">
-            الملاحظات
-          </h1>
+            {tr(" الملاحظات ")}</h1>
           <p className="text-[var(--text-secondary)] text-sm font-['Cairo'] mt-1 flex items-center gap-3">
-            <span>📝 {totalNotes} ملاحظة</span>
-            <span className="text-[#D4AF37]">📊 {totalWords} كلمة</span>
-            <span className="text-emerald-400">✏️ {totalChars} حرف</span>
+            <span>📝 {totalNotes} {tr(" ملاحظة")}</span>
+            <span className="text-[#D4AF37]">📊 {totalWords} {tr(" كلمة")}</span>
+            <span className="text-emerald-400">✏️ {totalChars} {tr(" حرف")}</span>
           </p>
         </div>
 
@@ -417,8 +418,7 @@ export default function NotesPage() {
           className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#D4AF37] text-[#0b1a2e] font-bold hover:shadow-lg hover:shadow-[#D4AF37]/30 transition-all duration-300 font-['Cairo']"
         >
           <Plus className="w-5 h-5" />
-          ملاحظة جديدة
-        </motion.button>
+          {tr(" ملاحظة جديدة ")}</motion.button>
       </motion.div>
 
       {/* ===== قائمة الملاحظات ===== */}
@@ -431,11 +431,9 @@ export default function NotesPage() {
         >
           <StickyNote className="w-20 h-20 text-[var(--text-muted)]/20 mb-4" />
           <h3 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">
-            لا توجد ملاحظات
-          </h3>
+            {tr(" لا توجد ملاحظات ")}</h3>
           <p className="text-[var(--text-secondary)] font-['Cairo'] mt-2">
-            ابدأ بإضافة ملاحظاتك لتنظيم أفكارك
-          </p>
+            {tr(" ابدأ بإضافة ملاحظاتك لتنظيم أفكارك ")}</p>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -443,8 +441,7 @@ export default function NotesPage() {
             className="mt-6 px-8 py-3 rounded-xl bg-[#D4AF37] text-[#0b1a2e] font-bold hover:shadow-lg hover:shadow-[#D4AF37]/30 transition-all duration-300 font-['Cairo']"
           >
             <Plus className="w-5 h-5 inline ml-2" />
-            أضف ملاحظة
-          </motion.button>
+            {tr(" أضف ملاحظة ")}</motion.button>
         </motion.div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

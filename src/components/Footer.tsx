@@ -1,5 +1,5 @@
 'use client'
-
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
 import Link from 'next/link'
 import { Logo } from '@/components/Logo'
 import { motion } from 'framer-motion'
@@ -8,23 +8,25 @@ import { Heart } from 'lucide-react'
 import { memo } from 'react'
 
 export const Footer = memo(function Footer() {
+  const { t: tr, language } = useLanguage()
+
   // ... نفس الكود الحالي بدون تغيير
 
   const year = new Date().getFullYear()
 
   const quickLinks = [
-    { href: '/dashboard', label: 'لوحة التحكم' },
-    { href: '/dashboard/planner', label: 'المخطط' },
-    { href: '/dashboard/schedule', label: 'الجداول' },
-    { href: '/dashboard/workspace', label: 'المهام' },
-    { href: '/dashboard/settings', label: 'الإعدادات' },
+    { href: '/dashboard', label: tr('لوحة التحكم') },
+    { href: '/dashboard/planner', label: tr('المخطط') },
+    { href: '/dashboard/schedule', label: tr('الجداول') },
+    { href: '/dashboard/workspace', label: tr('المهام') },
+    { href: '/dashboard/settings', label: tr('الإعدادات') },
   ]
 
   const socialLinks = [
-    { href: 'https://www.facebook.com/ywsf.hjazy.160024', icon: FaFacebookF, label: 'فيسبوك', color: 'hover:text-blue-500 hover:border-blue-500/50 hover:bg-blue-500/10' },
-    { href: 'https://www.instagram.com/hgz1312/', icon: FaInstagram, label: 'انستجرام', color: 'hover:text-pink-500 hover:border-pink-500/50 hover:bg-pink-500/10' },
-    { href: 'https://www.linkedin.com/in/yousef-hegazy-a0aa13333/', icon: FaLinkedinIn, label: 'لينكد إن', color: 'hover:text-blue-700 hover:border-blue-700/50 hover:bg-blue-700/10' },
-    { href: 'https://github.com/yousefhegazy131279', icon: FaGithub, label: 'جيت هاب', color: 'hover:text-purple-500 hover:border-purple-500/50 hover:bg-purple-500/10' },
+    { href: 'https://www.facebook.com/ywsf.hjazy.160024', icon: FaFacebookF, label: tr('فيسبوك'), color: 'hover:text-blue-500 hover:border-blue-500/50 hover:bg-blue-500/10' },
+    { href: 'https://www.instagram.com/hgz1312/', icon: FaInstagram, label: tr('انستجرام'), color: 'hover:text-pink-500 hover:border-pink-500/50 hover:bg-pink-500/10' },
+    { href: 'https://www.linkedin.com/in/yousef-hegazy-a0aa13333/', icon: FaLinkedinIn, label: tr('لينكد إن'), color: 'hover:text-blue-700 hover:border-blue-700/50 hover:bg-blue-700/10' },
+    { href: 'https://github.com/yousefhegazy131279', icon: FaGithub, label: tr('جيت هاب'), color: 'hover:text-purple-500 hover:border-purple-500/50 hover:bg-purple-500/10' },
   ]
 
   return (
@@ -66,23 +68,19 @@ export const Footer = memo(function Footer() {
               </motion.div>
               <div>
                 <h3 className="text-2xl font-bold font-['Amiri'] text-[var(--text-primary)]">
-                  جَدْوَلِي
-                </h3>
+                  {tr(" جَدْوَلِي ")}</h3>
                 <p className="text-xs text-[#D4AF37] font-['Cairo']">
-                  خطط يومك، أنجز مهامك، عش حياتك
-                </p>
+                  {tr(" خطط يومك، أنجز مهامك، عش حياتك ")}</p>
               </div>
             </div>
             <p className="text-sm text-[var(--text-secondary)] font-['Cairo'] leading-relaxed mb-5 max-w-md">
-              تطبيق إدارة الوقت والإنتاجية اليومية، مصمم خصيصًا للمستخدم العربي
-              ليجمع بين التخطيط الذكي والالتزام الروحي في مكان واحد.
-            </p>
+              {tr(" تطبيق إدارة الوقت والإنتاجية اليومية، مصمم خصيصًا للمستخدم العربي ليجمع بين التخطيط الذكي والالتزام الروحي في مكان واحد. ")}</p>
 
             {/* أزرار التواصل الاجتماعي */}
             <div className="flex gap-3 mb-6">
               {socialLinks.map(({ href, icon: Icon, label, color }) => (
                 <motion.a
-                  key={label}
+                  key={tr(label)}
                   href={href}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -90,7 +88,7 @@ export const Footer = memo(function Footer() {
                   whileTap={{ scale: 0.9 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 10 }}
                   className={`p-2.5 rounded-lg border border-[var(--border-color)] bg-transparent text-[var(--text-secondary)] transition-colors duration-200 ${color}`}
-                  aria-label={label}
+                  aria-label={tr(label)}
                 >
                   <Icon className="w-4 h-4" />
                 </motion.a>
@@ -102,8 +100,7 @@ export const Footer = memo(function Footer() {
               href="/about"
               className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full border-2 border-[#D4AF37]/50 text-[#D4AF37] hover:bg-[#D4AF37]/10 hover:border-[#D4AF37] hover:shadow-[0_0_20px_rgba(212,175,55,0.5)] transition-all duration-300 font-['Cairo'] text-sm font-bold"
             >
-              من نحن؟
-            </Link>
+              {tr(" من نحن؟ ")}</Link>
           </motion.div>
 
           {/* روابط سريعة */}
@@ -119,8 +116,7 @@ export const Footer = memo(function Footer() {
                 animate={{ height: ['16px', '20px', '16px'] }}
                 transition={{ duration: 2, repeat: Infinity }}
               />
-              روابط سريعة
-            </h4>
+              {tr(" روابط سريعة ")}</h4>
             <ul className="space-y-1.5">
               {quickLinks.map((link) => (
                 <motion.li
@@ -154,22 +150,20 @@ export const Footer = memo(function Footer() {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-3">
           <div className="text-sm text-[var(--text-muted)] font-['Cairo']">
-            © {year} <span className="text-[#D4AF37] font-bold font-['Amiri']">جَدْوَلِي</span> جميع الحقوق محفوظة
-          </div>
+            © {year} <span className="text-[#D4AF37] font-bold font-['Amiri']">{tr("جَدْوَلِي")}</span> {tr(" جميع الحقوق محفوظة ")}</div>
 
           <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] font-['Cairo']">
-            <span>الإصدار: v0.5</span>
+            <span>{tr("الإصدار: v1.0")}</span>
             <span className="mx-1 opacity-50">•</span>
             <span className="flex items-center gap-1">
-              صُنع بكل
-              <motion.span
+              {tr(" صُنع بكل ")}<motion.span
                 animate={{ scale: [1, 1.4, 1] }}
                 transition={{ repeat: Infinity, duration: 1, ease: 'easeInOut' }}
                 className="inline-block text-red-500"
               >
                 <Heart className="w-3 h-3 fill-red-500" />
               </motion.span>
-              من <span className="text-[#D4AF37] font-bold">HGZ</span>
+              {tr(" من ")}<span className="text-[#D4AF37] font-bold">HGZ</span>
             </span>
           </div>
         </div>

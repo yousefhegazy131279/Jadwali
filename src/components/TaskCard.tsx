@@ -1,5 +1,5 @@
 'use client'
-
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
 import { motion } from 'framer-motion'
 import { Task } from '@/types'
 import { Calendar, XCircle } from 'lucide-react'
@@ -12,6 +12,8 @@ type TaskCardProps = {
 }
 
 export function TaskCard({ task, index, onToggle, onDelete }: TaskCardProps) {
+  const { t: tr, language } = useLanguage()
+
   const priorityColors = {
     high: 'bg-red-500',
     medium: 'bg-yellow-500',
@@ -19,9 +21,9 @@ export function TaskCard({ task, index, onToggle, onDelete }: TaskCardProps) {
   }
 
   const priorityLabels = {
-    high: 'عاجل',
-    medium: 'متوسط',
-    low: 'عادي',
+    high: tr('عاجل'),
+    medium: tr('متوسط'),
+    low: tr('عادي'),
   }
 
   const priorityGlows = {

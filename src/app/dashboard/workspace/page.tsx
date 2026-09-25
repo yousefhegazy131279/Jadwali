@@ -1,6 +1,6 @@
-// src/app/(dashboard)/workspace/page.tsx
 'use client'
-
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
+// src/app/(dashboard)/workspace/page.tsx
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
@@ -59,6 +59,8 @@ function TaskItem({
   schedule?: Schedule
   index: number
 }) {
+  const { t: tr, language } = useLanguage()
+
   const isToday = schedule?.day === new Date().toISOString().split('T')[0]
 
   const typeColors = {
@@ -68,9 +70,9 @@ function TaskItem({
   }
 
   const typeLabels = {
-    study: 'دراسة',
-    side: 'جانبية',
-    custom: 'مخصصة',
+    study: tr('دراسة'),
+    side: tr('جانبية'),
+    custom: tr('مخصصة'),
   }
 
   const typeIcons = {
@@ -112,8 +114,7 @@ function TaskItem({
         {task.type === 'study' && task.duration > 0 && (
           <span className="text-xs text-[var(--text-muted)] font-['Cairo'] flex items-center gap-1">
             <Clock className="w-3 h-3" />
-            {task.duration} د
-          </span>
+            {task.duration} {tr(" د ")}</span>
         )}
 
         {/* نوع المهمة */}
@@ -135,12 +136,10 @@ function TaskItem({
         {/* مؤشر الحالة فقط */}
         {task.done ? (
           <span className="text-xs px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-['Cairo'] flex items-center gap-1">
-            <Check className="w-3 h-3" /> منجزة
-          </span>
+            <Check className="w-3 h-3" /> {tr(" منجزة ")}</span>
         ) : (
           <span className="text-xs px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 font-['Cairo'] flex items-center gap-1">
-            <Clock className="w-3 h-3" /> قيد التنفيذ
-          </span>
+            <Clock className="w-3 h-3" /> {tr(" قيد التنفيذ ")}</span>
         )}
       </div>
     </motion.div>
@@ -151,6 +150,8 @@ function TaskItem({
 //  الصفحة الرئيسية للمهام (للعرض فقط)
 // ============================================================
 export default function WorkspacePage() {
+  const { t: tr, language } = useLanguage()
+
   const { user } = useSupabase()
   const [loading, setLoading] = useState(true)
   const [tasks, setTasks] = useState<Task[]>([])
@@ -238,7 +239,7 @@ export default function WorkspacePage() {
   }
 
   return (
-    <div className="p-6 space-y-6" dir="rtl">
+    <div className="p-6 space-y-6" >
       {/* ===== الهيدر ===== */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -248,12 +249,11 @@ export default function WorkspacePage() {
       >
         <div>
           <h1 className="text-3xl font-bold font-['Amiri'] text-[var(--text-primary)]">
-            📋 المهام
-          </h1>
+            {tr(" 📋 المهام ")}</h1>
           <p className="text-[var(--text-secondary)] text-sm font-['Cairo'] mt-1 flex items-center gap-3">
-            <span>{totalTasks} مهمة</span>
-            <span className="text-emerald-400">✅ {completedTasks} مكتملة</span>
-            <span className="text-[#D4AF37]">⏳ {todayTasks} اليوم</span>
+            <span>{totalTasks} {tr(" مهمة")}</span>
+            <span className="text-emerald-400">✅ {completedTasks} {tr(" مكتملة")}</span>
+            <span className="text-[#D4AF37]">⏳ {todayTasks} {tr(" اليوم")}</span>
           </p>
         </div>
       </motion.div>
@@ -268,14 +268,14 @@ export default function WorkspacePage() {
         {/* تصفية حسب النوع */}
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-[var(--text-muted)]" />
-          <span className="text-sm text-[var(--text-secondary)] font-['Cairo']">النوع:</span>
+          <span className="text-sm text-[var(--text-secondary)] font-['Cairo']">{tr("النوع:")}</span>
         </div>
         <div className="flex gap-1">
           {[
-            { value: 'all', label: 'الكل' },
-            { value: 'study', label: 'دراسة' },
-            { value: 'side', label: 'جانبية' },
-            { value: 'custom', label: 'مخصصة' },
+            { value: 'all', label: tr('الكل') },
+            { value: 'study', label: tr('دراسة') },
+            { value: 'side', label: tr('جانبية') },
+            { value: 'custom', label: tr('مخصصة') },
           ].map((f) => (
             <button
               key={f.value}
@@ -296,14 +296,14 @@ export default function WorkspacePage() {
         {/* تصفية حسب الحالة */}
         <div className="flex items-center gap-2">
           <Clock className="w-4 h-4 text-[var(--text-muted)]" />
-          <span className="text-sm text-[var(--text-secondary)] font-['Cairo']">الحالة:</span>
+          <span className="text-sm text-[var(--text-secondary)] font-['Cairo']">{tr("الحالة:")}</span>
         </div>
         <div className="flex gap-1">
           {[
-            { value: 'all', label: 'الكل' },
-            { value: 'today', label: 'اليوم' },
-            { value: 'later', label: 'لاحقاً' },
-            { value: 'done', label: 'منجزة' },
+            { value: 'all', label: tr('الكل') },
+            { value: 'today', label: tr('اليوم') },
+            { value: 'later', label: tr('لاحقاً') },
+            { value: 'done', label: tr('منجزة') },
           ].map((f) => (
             <button
               key={f.value}
@@ -330,12 +330,11 @@ export default function WorkspacePage() {
         >
           <ListChecks className="w-20 h-20 text-[var(--text-muted)]/20 mb-4" />
           <h3 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">
-            لا توجد مهام
-          </h3>
+            {tr(" لا توجد مهام ")}</h3>
           <p className="text-[var(--text-secondary)] font-['Cairo'] mt-2">
             {tasks.length === 0
-              ? 'أنشئ جدولاً أولاً من خلال المخطط الذكي'
-              : 'لا توجد مهام تطابق معايير التصفية'}
+              ? tr('أنشئ جدولاً أولاً من خلال المخطط الذكي')
+              : tr('لا توجد مهام تطابق معايير التصفية')}
           </p>
         </motion.div>
       ) : (

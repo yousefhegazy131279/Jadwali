@@ -1,5 +1,5 @@
 'use client'
-
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
 import { createClient } from '@/lib/supabase/client'
 import { createContext, useContext, useEffect, useState } from 'react'
 import { toast } from 'sonner'
@@ -16,6 +16,8 @@ type SupabaseContextType = {
 const SupabaseContext = createContext<SupabaseContextType | undefined>(undefined)
 
 export function SupabaseProvider({ children }: { children: React.ReactNode }) {
+  const { t: tr, language } = useLanguage()
+
   const [supabase] = useState(() => createClient())
   const [user, setUser] = useState<any | null>(null)
   const [fullName, setFullName] = useState<string | null>(null)
@@ -23,68 +25,31 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true) // ✅ حالة التحميل
 
   useEffect(() => {
-    const fetchUser = async () => {
-      setIsLoading(true)
-      const { data } = await supabase.auth.getUser()
-      const u = data.user
-      setUser(u)
+    let active = true
+    void supabase.auth.getUser().then(({ data }) => {
+      if (active) { setUser(data.user); if (!data.user) { setIsAdmin(false); setIsLoading(false) } }
+    })
+    // Never await a Supabase query inside the auth callback: the auth lock is held.
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+      if (!session?.user) { setFullName(null); setIsAdmin(false); setIsLoading(false) }
+    })
+    return () => { active = false; listener.subscription.unsubscribe() }
+  }, [supabase])
 
-      let name = u?.user_metadata?.full_name || u?.user_metadata?.name || null
-
-      if (u) {
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('role, full_name')
-          .eq('id', u.id)
-          .single()
-
-        if (!error && profile) {
-          setIsAdmin(profile.role === 'admin')
-          if (profile.full_name) name = profile.full_name
-        } else {
-          setIsAdmin(false)
-        }
-      } else {
-        setIsAdmin(false)
-      }
-
-      setFullName(name)
-      setIsLoading(false)
-    }
-
-    fetchUser()
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const u = session?.user ?? null
-      setUser(u)
-
-      let name = u?.user_metadata?.full_name || u?.user_metadata?.name || null
-
-      if (u) {
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('role, full_name')
-          .eq('id', u.id)
-          .single()
-
-        if (!error && profile) {
-          setIsAdmin(profile.role === 'admin')
-          if (profile.full_name) name = profile.full_name
-        } else {
-          setIsAdmin(false)
-        }
-      } else {
-        setIsAdmin(false)
-      }
-
-      setFullName(name)
+  useEffect(() => {
+    if (!user) return
+    let active = true
+    setIsLoading(true)
+    setIsAdmin(null)
+    void supabase.from('profiles').select('role,full_name').eq('id', user.id).maybeSingle().then(({ data }) => {
+      if (!active) return
+      setFullName(data?.full_name || user.user_metadata?.full_name || user.user_metadata?.name || null)
+      setIsAdmin(data?.role === 'admin')
       setIsLoading(false)
     })
-
-    return () => {
-      authListener.subscription.unsubscribe()
-    }
-  }, [supabase])
+    return () => { active = false }
+  }, [user?.id, supabase])
 
   const updateFullName = async (name: string) => {
     if (!user) return
@@ -102,10 +67,10 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
 
     if (!authError && !profileError) {
       setFullName(name)
-      toast.success('تم حفظ الاسم بنجاح')
+      toast.success(tr('تم حفظ الاسم بنجاح'))
     } else {
-      toast.error('حدث خطأ في حفظ الاسم')
-      console.error('authError:', authError, 'profileError:', profileError)
+      toast.error(tr('حدث خطأ في حفظ الاسم'))
+      throw authError || profileError
     }
   }
 

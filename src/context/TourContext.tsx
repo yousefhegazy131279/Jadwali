@@ -1,5 +1,5 @@
 'use client'
-
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { tourSteps } from '@/lib/tourSteps'
@@ -18,6 +18,8 @@ type TourContextType = {
 const TourContext = createContext<TourContextType | undefined>(undefined)
 
 export function TourProvider({ children }: { children: ReactNode }) {
+  const { t: tr, language } = useLanguage()
+
   const router = useRouter()
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
@@ -68,7 +70,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
   const nextStep = useCallback(() => {
     const step = tourSteps[currentStep]
-    if (step?.required && !isActionDone) {
+    if (step?.required && !isActionDone && document.querySelector(step.selector)) {
       return
     }
     setCurrentStep(prev => Math.min(prev + 1, tourSteps.length))

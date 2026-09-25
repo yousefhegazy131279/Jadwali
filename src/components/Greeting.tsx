@@ -1,8 +1,8 @@
+'use client'
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
 // ============================================================
 //  2. `src/components/Greeting.tsx` (جمل ترحيبية مختلفة)
 // ============================================================
-'use client'
-
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 
@@ -18,6 +18,8 @@ const greetings = [
 ]
 
 export function Greeting({ name }: { name: string }) {
+  const { t: tr, language } = useLanguage()
+
   const [greeting, setGreeting] = useState('')
 
   useEffect(() => {
@@ -32,7 +34,7 @@ export function Greeting({ name }: { name: string }) {
       transition={{ delay: 0.2 }}
       className="text-gray-300 text-sm font-['Cairo']"
     >
-      {greeting} {name && `، ${name}`}
+      {tr(greeting)} {name && `، ${name}`}
     </motion.div>
   )
 }

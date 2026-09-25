@@ -1,5 +1,5 @@
 'use client'
-
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
@@ -30,8 +30,9 @@ import {
   HelpCircle,
 } from 'lucide-react'
 import { format } from 'date-fns'
-import { ar } from 'date-fns/locale'
+import { ar, enUS } from 'date-fns/locale'
 import { useTimer } from '@/context/TimerContext'
+import WelcomeAnimation from '@/components/WelcomeAnimation'
 import { useTour } from '@/context/TourContext'
 
 // ==================== Types ====================
@@ -78,6 +79,8 @@ type ScheduleWithSessions = Schedule & {
 
 // ==================== Helper Components ====================
 function StatCard({ icon: Icon, value, label, subText, color = 'gold', delay = 0 }: any) {
+  const { t: tr, language } = useLanguage()
+
   const colors: any = {
     gold: 'from-[#D4AF37]/20 to-[#D4AF37]/5',
     blue: 'from-blue-500/20 to-blue-500/5',
@@ -119,9 +122,9 @@ function StatCard({ icon: Icon, value, label, subText, color = 'gold', delay = 0
               {value}
             </span>
           </motion.div>
-          <div className="text-[var(--text-secondary)] text-sm font-['Cairo']">{label}</div>
+          <div className="text-[var(--text-secondary)] text-sm font-['Cairo']">{tr(label)}</div>
           {subText && (
-            <div className="text-[var(--text-muted)] text-xs mt-1 font-['Cairo']">{subText}</div>
+            <div className="text-[var(--text-muted)] text-xs mt-1 font-['Cairo']">{tr(subText)}</div>
           )}
         </div>
       </div>
@@ -136,12 +139,14 @@ function StatCard({ icon: Icon, value, label, subText, color = 'gold', delay = 0
 }
 
 function ImportantTaskItem({ task }: { task: Task }) {
+  const { t: tr, language } = useLanguage()
+
   return (
     <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[#D4AF37]/20 transition-all duration-300">
       <div className={`w-1.5 h-8 rounded-full ${task.priority === 'high' ? 'bg-red-500' : 'bg-yellow-500'}`} />
       <span className="flex-1 font-['Cairo'] text-[var(--text-primary)]">{task.name}</span>
       <span className="text-xs text-[var(--text-muted)] font-['Cairo']">
-        {task.due_date ? format(new Date(task.due_date), 'dd/MM', { locale: ar }) : '—'}
+        {task.due_date ? format(new Date(task.due_date), 'dd/MM', { locale: language === 'ar' ? ar : enUS }) : '—'}
       </span>
     </div>
   )
@@ -155,6 +160,8 @@ function CircularTimer({ timeLeft, totalDuration, taskName, scheduleTitle, isPau
   scheduleTitle: string | null
   isPaused: boolean
 }) {
+  const { t: tr, language } = useLanguage()
+
   const radius = 50
   const circumference = 2 * Math.PI * radius
   const progress = totalDuration > 0 ? Math.max(0, Math.min(1, timeLeft / totalDuration)) : 0
@@ -190,7 +197,7 @@ function CircularTimer({ timeLeft, totalDuration, taskName, scheduleTitle, isPau
               {formatTime(timeLeft)}
             </div>
             {isPaused && (
-              <div className="text-xs text-yellow-400 font-['Cairo'] mt-1">متوقف مؤقتاً</div>
+              <div className="text-xs text-yellow-400 font-['Cairo'] mt-1">{tr("متوقف مؤقتاً")}</div>
             )}
           </div>
         </div>
@@ -220,6 +227,8 @@ function getLocalToday() {
 
 // ==================== Dashboard Page ====================
 export default function DashboardPage() {
+  const { t: tr, language } = useLanguage()
+
   const router = useRouter()
   const { user, fullName } = useSupabase()
   const { timerState, pauseTimer, resumeTimer, resetTimer } = useTimer()
@@ -323,10 +332,10 @@ export default function DashboardPage() {
 
       // ✅ فحص ما إذا كان المؤقت يشير إلى جدول محذوف
       if (timerState.scheduleId) {
-        const exists = schedulesList.some(s => s.id === timerState.scheduleId)
-        if (!exists) {
+        const { data: activeSchedule, error: activeError } = await supabase.from('schedules').select('id').eq('id', timerState.scheduleId).maybeSingle()
+        if (!activeError && !activeSchedule) {
           resetTimer()
-          toast.info('تم إيقاف المؤقت لأن الجدول المرتبط به لم يعد موجودًا.')
+          toast.info(tr('تم إيقاف المؤقت لأن الجدول المرتبط به لم يعد موجودًا.'))
         }
       }
 
@@ -342,7 +351,7 @@ export default function DashboardPage() {
 
     } catch (error) {
       console.error('Dashboard fetch error:', error)
-      toast.error('تعذر تحميل البيانات')
+      toast.error(tr('تعذر تحميل البيانات'))
     } finally {
       setLoading(false)
     }
@@ -405,22 +414,22 @@ export default function DashboardPage() {
 
   const getGreetingTime = () => {
     const hour = new Date().getHours()
-    if (hour < 12) return 'صباح الخير'
-    if (hour < 18) return 'مساء الخير'
-    return 'مساء الخير'
+    if (hour < 12) return tr('صباح الخير')
+    if (hour < 18) return tr('مساء الخير')
+    return tr('مساء الخير')
   }
 
   const handleEnableNotifications = async () => {
     if (!('Notification' in window)) {
-      toast.error('المتصفح لا يدعم الإشعارات')
+      toast.error(tr('المتصفح لا يدعم الإشعارات'))
       setNotificationPermission('unsupported')
       return
     }
     try {
       const permission = await Notification.requestPermission()
       setNotificationPermission(permission)
-      if (permission === 'granted') toast.success('تم تفعيل الإشعارات بنجاح')
-      else toast.error('تم رفض الإشعارات')
+      if (permission === 'granted') toast.success(tr('تم تفعيل الإشعارات بنجاح'))
+      else toast.error(tr('تم رفض الإشعارات'))
     } catch (error) {
       console.error(error)
     }
@@ -433,8 +442,8 @@ export default function DashboardPage() {
       list.push({
         id: `task-${t.id}`,
         type: 'task',
-        title: `مهمة هامة: ${t.name}`,
-        description: t.due_date ? `تستحق ${format(new Date(t.due_date), 'dd/MM', { locale: ar })}` : 'أولوية عالية',
+        title: `${tr('مهمة هامة', 'Priority task')}: ${t.name}`,
+        description: t.due_date ? `${tr('تستحق', 'Due')} ${format(new Date(t.due_date), 'dd/MM', { locale: language === 'ar' ? ar : enUS })}` : tr('أولوية عالية'),
       })
     })
     if (todaySchedule && todaySchedule.totalSessions > 0) {
@@ -442,7 +451,7 @@ export default function DashboardPage() {
         id: 'today-sessions',
         type: 'session',
         title: `جلسات اليوم`,
-        description: `المجموع: ${todaySchedule.totalSessions} • المنجز: ${stats.completedSessions} • المتبقي: ${stats.remainingSessions}`,
+        description: `${tr('إجمالي الجلسات')}: ${todaySchedule.totalSessions} • ${tr('منجزة')}: ${stats.completedSessions} • ${tr('متبقية','Remaining')}: ${stats.remainingSessions}`,
       })
     }
     return list
@@ -484,7 +493,7 @@ export default function DashboardPage() {
 
   const handleDeleteSchedule = async (scheduleId: string, event: React.MouseEvent) => {
     event.stopPropagation()
-    if (!confirm('هل أنت متأكد من حذف هذا الجدول؟ سيتم حذف جميع المهام والصلوات المرتبطة به.')) return
+    if (!confirm(tr('هل أنت متأكد من حذف هذا الجدول؟ سيتم حذف جميع المهام والصلوات المرتبطة به.'))) return
 
     const supabase = createClient()
     try {
@@ -503,16 +512,17 @@ export default function DashboardPage() {
         resetTimer()
       }
 
-      toast.success('🗑️ تم حذف الجدول بنجاح')
+      toast.success(tr('🗑️ تم حذف الجدول بنجاح'))
       fetchData()
     } catch (error) {
       console.error('Error deleting schedule:', error)
-      toast.error('حدث خطأ أثناء حذف الجدول')
+      toast.error(tr('حدث خطأ أثناء حذف الجدول'))
     }
   }
 
   return (
-    <div className="relative min-h-screen p-6 space-y-6 text-[var(--text-primary)] font-['Cairo'] transition-colors duration-300" dir="rtl">
+    <div className="relative min-h-screen p-2 sm:p-6 space-y-6 text-[var(--text-primary)] font-['Cairo'] transition-colors duration-300" >
+      <WelcomeAnimation />
       <div className="fixed inset-0 z-0 pointer-events-none">
         <NeonParticles />
         <div className="absolute top-10 left-10 w-80 h-80 rounded-full bg-[#D4AF37]/5 blur-3xl animate-pulse" style={{ animationDuration: '6s' }} />
@@ -542,11 +552,11 @@ export default function DashboardPage() {
                 </motion.div>
                 <div>
                   <h1 className="text-3xl md:text-4xl font-bold font-['Amiri'] text-[var(--text-primary)]">
-                    {getGreetingTime()}، <span className="text-[#D4AF37]">{fullName || 'مستخدم'}</span>
+                    {getGreetingTime()}{tr("، ")}<span className="text-[#D4AF37]">{fullName || tr('مستخدم')}</span>
                   </h1>
                   <div className="flex items-center gap-3 mt-1">
                     <span className="text-[var(--text-secondary)] font-['Cairo']">
-                      {format(new Date(), 'EEEE، d MMMM yyyy', { locale: ar })}
+                      {format(new Date(), 'EEEE، d MMMM yyyy', { locale: language === 'ar' ? ar : enUS })}
                     </span>
                     <Clock />
                   </div>
@@ -561,11 +571,11 @@ export default function DashboardPage() {
   whileTap={{ scale: 0.95 }}
   onClick={startTour}
   className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#E8C84A] text-[#0b1a2e] font-bold shadow-lg hover:shadow-xl hover:shadow-[#D4AF37]/40 transition-all duration-300 font-['Cairo'] text-sm border border-[#D4AF37]/50"
-  title="بدء جولة تعريفية تشرح طريقة عمل الموقع خطوة بخطوة"
+  title={tr("بدء جولة تعريفية تشرح طريقة عمل الموقع خطوة بخطوة")}
 >
   <HelpCircle className="w-5 h-5" />
-  <span className="hidden sm:inline">جولة تعريفية</span>
-  <span className="sm:hidden">جولة</span>
+  <span className="hidden sm:inline">{tr("جولة تعريفية")}</span>
+  <span className="sm:hidden">{tr("جولة")}</span>
 </motion.button>
 
               {/* Notifications */}
@@ -593,7 +603,7 @@ export default function DashboardPage() {
                     className="absolute top-14 left-0 w-80 max-h-96 overflow-y-auto rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl z-[100] p-2"
                   >
                     <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-color)]">
-                      <h4 className="font-bold text-sm">الإشعارات</h4>
+                      <h4 className="font-bold text-sm">{tr("الإشعارات")}</h4>
                       <button onClick={() => setNotificationsOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
                         <X className="w-4 h-4" />
                       </button>
@@ -601,7 +611,7 @@ export default function DashboardPage() {
                     {notifications.length === 0 ? (
                       <div className="text-center py-8 text-[var(--text-muted)]">
                         <Bell className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                        <p className="text-sm">لا توجد إشعارات</p>
+                        <p className="text-sm">{tr("لا توجد إشعارات")}</p>
                       </div>
                     ) : (
                       <div className="space-y-1 mt-2">
@@ -623,8 +633,7 @@ export default function DashboardPage() {
                         onClick={handleEnableNotifications}
                         className="mt-2 w-full py-2 rounded-lg bg-[#D4AF37] text-[#0b1a2e] text-sm font-bold hover:bg-[#D4AF37]/90 transition-colors"
                       >
-                        تفعيل إشعارات المتصفح
-                      </button>
+                        {tr(" تفعيل إشعارات المتصفح ")}</button>
                     )}
                   </motion.div>
                 )}
@@ -632,7 +641,7 @@ export default function DashboardPage() {
 
               <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--bg-card)] shadow-md border border-[var(--border-color)]">
                 <User className="w-4 h-4 text-[#D4AF37]" />
-                <span className="text-sm text-[var(--text-secondary)]">{fullName || 'مستخدم'}</span>
+                <span className="text-sm text-[var(--text-secondary)]">{fullName || tr('مستخدم')}</span>
               </div>
             </div>
           </div>
@@ -641,16 +650,16 @@ export default function DashboardPage() {
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4" data-tour="dashboard-stats">
           <div data-aos="fade-up" data-aos-delay="100">
-            <StatCard icon={Calendar} value={stats.schedulesCount} label="عدد الجداول" subText="خطة يومية" color="gold" delay={0.1} />
+            <StatCard icon={Calendar} value={stats.schedulesCount} label={tr("عدد الجداول")} subText={tr("خطة يومية")} color="gold" delay={0.1} />
           </div>
           <div data-aos="fade-up" data-aos-delay="200">
-            <StatCard icon={ListChecks} value={stats.remainingTasks} label="المهام المتبقية" subText="غير منجزة" color="blue" delay={0.2} />
+            <StatCard icon={ListChecks} value={stats.remainingTasks} label={tr("المهام المتبقية")} subText={tr("غير منجزة")} color="blue" delay={0.2} />
           </div>
           <div data-aos="fade-up" data-aos-delay="300">
-            <StatCard icon={ClockIcon} value={stats.remainingSessions} label="الجلسات المتبقية" subText="لم تبدأ بعد" color="purple" delay={0.3} />
+            <StatCard icon={ClockIcon} value={stats.remainingSessions} label={tr("الجلسات المتبقية")} subText={tr("لم تبدأ بعد")} color="purple" delay={0.3} />
           </div>
           <div data-aos="fade-up" data-aos-delay="400">
-            <StatCard icon={CheckCircle} value={stats.completedSessions} label="الجلسات المنجزة" subText="مكتملة ✅" color="green" delay={0.4} />
+            <StatCard icon={CheckCircle} value={stats.completedSessions} label={tr("الجلسات المنجزة")} subText={tr("مكتملة ✅")} color="green" delay={0.4} />
           </div>
         </div>
 
@@ -666,14 +675,14 @@ export default function DashboardPage() {
             >
               <div className="flex items-center gap-2 mb-4">
                 <Flame className="w-5 h-5 text-orange-400" />
-                <h3 className="font-bold">مهام اليوم الهامة</h3>
-                <span className="mr-auto text-xs text-[var(--text-muted)]">{importantTasks.length} مهام</span>
+                <h3 className="font-bold">{tr("مهام اليوم الهامة")}</h3>
+                <span className="mr-auto text-xs text-[var(--text-muted)]">{importantTasks.length} {tr(" مهام")}</span>
               </div>
               <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
                 {importantTasks.length === 0 ? (
                   <div className="text-center py-6 text-[var(--text-muted)]">
                     <CheckCircle className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                    <p className="text-sm">🎉 لا توجد مهام هامة اليوم</p>
+                    <p className="text-sm">{tr("🎉 لا توجد مهام هامة اليوم")}</p>
                   </div>
                 ) : (
                   importantTasks.map(task => <ImportantTaskItem key={task.id} task={task} />)
@@ -710,8 +719,7 @@ export default function DashboardPage() {
                           onClick={resumeTimer}
                           className="px-6 py-2 rounded-xl bg-emerald-500 text-white font-bold shadow-lg hover:shadow-emerald-500/30 transition-all"
                         >
-                          ▶ استئناف
-                        </motion.button>
+                          {tr(" ▶ استئناف ")}</motion.button>
                       ) : (
                         <motion.button
                           whileHover={{ scale: 1.05 }}
@@ -719,8 +727,7 @@ export default function DashboardPage() {
                           onClick={pauseTimer}
                           className="px-6 py-2 rounded-xl bg-yellow-500 text-white font-bold shadow-lg hover:shadow-yellow-500/30 transition-all"
                         >
-                          ⏸ إيقاف مؤقت
-                        </motion.button>
+                          {tr(" ⏸ إيقاف مؤقت ")}</motion.button>
                       )}
                     </div>
                   </>
@@ -735,9 +742,9 @@ export default function DashboardPage() {
                         <Play className="w-12 h-12 text-[#D4AF37] mr-1" />
                       </div>
                     </motion.div>
-                    <h3 className="text-2xl font-bold font-['Amiri']">ابدأ جلسة</h3>
+                    <h3 className="text-2xl font-bold font-['Amiri']">{tr("ابدأ جلسة")}</h3>
                     <p className="text-[var(--text-secondary)] text-sm mt-1">
-                      {todaySchedule ? `${todaySchedule.totalSessions} جلسات اليوم • ${stats.completedSessions} منجزة • ${stats.remainingSessions} متبقية` : 'لا توجد جلسات اليوم'}
+                      {todaySchedule ? `${todaySchedule.totalSessions} ${tr('جلسات اليوم')} • ${stats.completedSessions} ${tr('منجزة')} • ${stats.remainingSessions} ${tr('متبقية','remaining')}` : tr('لا توجد جلسات اليوم')}
                     </p>
                     <motion.button
                       whileHover={{ scale: 1.05 }}
@@ -748,8 +755,7 @@ export default function DashboardPage() {
                     >
                       <span className="flex items-center gap-2">
                         <Zap className="w-5 h-5" />
-                        ابدأ التركيز
-                      </span>
+                        {tr(" ابدأ التركيز ")}</span>
                     </motion.button>
                   </>
                 )}
@@ -769,15 +775,15 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-[#D4AF37]" />
-                  <h3 className="font-bold">الجداول</h3>
+                  <h3 className="font-bold">{tr("الجداول")}</h3>
                 </div>
-                <span className="text-xs text-[var(--text-muted)]">{schedules.length} جدول</span>
+                <span className="text-xs text-[var(--text-muted)]">{schedules.length} {tr(" جدول")}</span>
               </div>
               <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
                 {schedules.length === 0 ? (
                   <div className="text-center py-6 text-[var(--text-muted)]">
                     <Calendar className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                    <p className="text-sm">لا توجد جداول</p>
+                    <p className="text-sm">{tr("لا توجد جداول")}</p>
                   </div>
                 ) : (
                   schedules.slice(0, 5).map(schedule => (
@@ -797,13 +803,12 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-2">
                           {schedule.day === today && (
                             <span className="text-xs px-2 py-1 rounded-full bg-[#D4AF37]/20 text-[#D4AF37] animate-pulse">
-                              ✅ اليوم
-                            </span>
+                              {tr(" ✅ اليوم ")}</span>
                           )}
                           <button
                             onClick={(e) => handleDeleteSchedule(schedule.id, e)}
                             className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-red-500/10 text-red-400"
-                            title="حذف الجدول"
+                            title={tr("حذف الجدول")}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -811,10 +816,10 @@ export default function DashboardPage() {
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-[var(--text-secondary)]">
-                          {format(new Date(schedule.day), 'EEEE، d MMMM', { locale: ar })}
+                          {format(new Date(schedule.day), 'EEEE، d MMMM', { locale: language === 'ar' ? ar : enUS })}
                         </span>
                         <span className="text-xs text-[var(--text-muted)]">
-                          منجز: {schedule.completedSessions} • متبقي: {schedule.totalSessions - schedule.completedSessions}
+                          {tr(" منجز: ")}{schedule.completedSessions} {tr(" • متبقي: ")}{schedule.totalSessions - schedule.completedSessions}
                         </span>
                       </div>
                     </div>
@@ -827,8 +832,7 @@ export default function DashboardPage() {
   className="mt-3 w-full py-2 rounded-xl bg-[#D4AF37]/10 text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-colors font-['Cairo'] border border-[#D4AF37]/30 flex items-center justify-center gap-2 text-sm"
 >
   <Plus className="w-4 h-4" />
-  أضف جدولاً جديداً
-</button>
+  {tr(" أضف جدولاً جديداً ")}</button>
             </motion.div>
           </div>
         </div>

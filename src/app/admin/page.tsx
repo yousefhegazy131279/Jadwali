@@ -1,5 +1,5 @@
 'use client'
-
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -44,6 +44,7 @@ type ScheduleSummary = {
   title: string
   day: string
   start_time: string | null
+  tasks: { id: string; name: string; done: boolean; completed_sessions: number | null }[]
   taskCount: number
   completedSessions: number
 }
@@ -57,6 +58,8 @@ type UserStats = {
 }
 
 export default function AdminPage() {
+  const { t: tr, language } = useLanguage()
+
   const router = useRouter()
   const { user, isAdmin } = useSupabase()
   const [loading, setLoading] = useState(true)
@@ -81,7 +84,7 @@ export default function AdminPage() {
       return
     }
     if (isAdmin === false) {
-      toast.error('غير مصرح لك بالوصول')
+      toast.error(tr('غير مصرح لك بالوصول'))
       router.replace('/dashboard')
       return
     }
@@ -95,15 +98,16 @@ export default function AdminPage() {
 
     try {
       const [
-        { data: profiles },
-        { data: schedules },
-        { data: tasks },
+        { data: profiles, error: profilesError },
+        { data: schedules, error: schedulesError },
+        { data: tasks, error: tasksError },
       ] = await Promise.all([
         supabase.from('profiles').select('*'),
         supabase.from('schedules').select('*'),
         supabase.from('tasks').select('*'),
       ])
 
+      if (profilesError || schedulesError || tasksError) throw profilesError || schedulesError || tasksError
       const schedulesData = schedules || []
       const tasksData = tasks || []
 
@@ -132,6 +136,7 @@ export default function AdminPage() {
             title: s.title,
             day: s.day,
             start_time: s.start_time,
+            tasks: tasksData.filter(t => t.schedule_id === s.id),
             taskCount: userTasks.filter(t => t.schedule_id === s.id).length,
             completedSessions: userTasks
               .filter(t => t.schedule_id === s.id)
@@ -143,14 +148,14 @@ export default function AdminPage() {
       setUsers(userStats)
     } catch (error) {
       console.error('Admin fetch error:', error)
-      toast.error('حدث خطأ في تحميل البيانات')
+      toast.error(tr('حدث خطأ في تحميل البيانات'))
     } finally {
       setLoading(false)
     }
   }, [])
 
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا المستخدم وجميع بياناته نهائيًا؟')) return
+    if (!confirm(tr('هل أنت متأكد من حذف هذا المستخدم وجميع بياناته نهائيًا؟'))) return
     const supabase = createClient()
 
     try {
@@ -161,11 +166,11 @@ export default function AdminPage() {
       await supabase.from('notifications').delete().eq('user_id', userId)
       await supabase.from('profiles').delete().eq('id', userId)
 
-      toast.success('تم حذف المستخدم بنجاح')
+      toast.success(tr('تم حذف المستخدم بنجاح'))
       fetchAdminData()
     } catch (error) {
       console.error(error)
-      toast.error('حدث خطأ أثناء الحذف')
+      toast.error(tr('حدث خطأ أثناء الحذف'))
     }
   }
 
@@ -179,22 +184,22 @@ export default function AdminPage() {
       .eq('id', userId)
 
     if (error) {
-      toast.error('حدث خطأ في تغيير الدور')
+      toast.error(tr('حدث خطأ في تغيير الدور'))
     } else {
-      toast.success(`تم تغيير الدور إلى ${newRole === 'admin' ? 'أدمن' : 'مستخدم'}`)
+      toast.success(`${tr('تم تغيير الدور إلى', 'Role changed to')} ${newRole === 'admin' ? tr('أدمن') : tr('مستخدم')}`)
       fetchAdminData()
     }
   }
 
   const handleSendBroadcast = async () => {
     if (!broadcastMessage.trim()) {
-      toast.error('اكتب نص الإشعار')
+      toast.error(tr('اكتب نص الإشعار'))
       return
     }
 
     const supabase = createClient()
     const notification = {
-      title: 'إشعار من الإدارة',
+      title: tr('إشعار من الإدارة'),
       body: broadcastMessage.trim(),
       type: 'broadcast',
       read: false,
@@ -206,9 +211,9 @@ export default function AdminPage() {
       .insert(users.map(u => ({ ...notification, user_id: u.profile.id })))
 
     if (error) {
-      toast.error('حدث خطأ في إرسال الإشعار')
+      toast.error(tr('حدث خطأ في إرسال الإشعار'))
     } else {
-      toast.success('تم إرسال الإشعار للجميع')
+      toast.success(tr('تم إرسال الإشعار للجميع'))
       setBroadcastMessage('')
       setShowBroadcast(false)
     }
@@ -272,7 +277,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6" dir="rtl">
+    <div className="p-4 sm:p-6 space-y-6" >
       {/* الهيدر */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -284,8 +289,7 @@ export default function AdminPage() {
             <Shield className="w-8 h-8" />
           </div>
           <h1 className="text-3xl font-bold font-['Amiri'] text-[var(--text-primary)]">
-            لوحة الأدمن
-          </h1>
+            {tr(" لوحة الأدمن ")}</h1>
         </div>
         <div className="flex gap-2 flex-wrap">
           <button
@@ -293,33 +297,30 @@ export default function AdminPage() {
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#D4AF37]/10 text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-colors font-['Cairo'] border border-[#D4AF37]/30"
           >
             <Send className="w-4 h-4" />
-            إشعار جماعي
-          </button>
+            {tr(" إشعار جماعي ")}</button>
           <button
             onClick={handleExportUsers}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 text-[var(--text-secondary)] hover:bg-white/10 transition-colors font-['Cairo'] border border-[var(--border-color)]"
           >
             <FileSpreadsheet className="w-4 h-4" />
-            تصدير المستخدمين
-          </button>
+            {tr(" تصدير المستخدمين ")}</button>
           <button
             onClick={handleExportAllData}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 text-[var(--text-secondary)] hover:bg-white/10 transition-colors font-['Cairo'] border border-[var(--border-color)]"
           >
             <FileJson className="w-4 h-4" />
-            تصدير كامل
-          </button>
+            {tr(" تصدير كامل ")}</button>
         </div>
       </motion.div>
 
       {/* بطاقات الإحصائيات */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard icon={Users} value={globalStats.totalUsers} label="المستخدمون" color="gold" />
-        <StatCard icon={Calendar} value={globalStats.totalSchedules} label="الجداول" color="blue" />
-        <StatCard icon={ListChecks} value={globalStats.totalTasks} label="المهام" color="purple" />
-        <StatCard icon={CheckCircle} value={globalStats.completedTasks} label="مهام منجزة" color="green" />
-        <StatCard icon={Clock} value={globalStats.totalSessions} label="إجمالي الجلسات" color="teal" />
-        <StatCard icon={TrendingUp} value={globalStats.completedSessions} label="جلسات منجزة" color="red" />
+        <StatCard icon={Users} value={globalStats.totalUsers} label={tr("المستخدمون")} color="gold" />
+        <StatCard icon={Calendar} value={globalStats.totalSchedules} label={tr("الجداول")} color="blue" />
+        <StatCard icon={ListChecks} value={globalStats.totalTasks} label={tr("المهام")} color="purple" />
+        <StatCard icon={CheckCircle} value={globalStats.completedTasks} label={tr("مهام منجزة")} color="green" />
+        <StatCard icon={Clock} value={globalStats.totalSessions} label={tr("إجمالي الجلسات")} color="teal" />
+        <StatCard icon={TrendingUp} value={globalStats.completedSessions} label={tr("جلسات منجزة")} color="red" />
       </div>
 
       {/* البحث */}
@@ -327,7 +328,7 @@ export default function AdminPage() {
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
         <input
           type="text"
-          placeholder="ابحث عن مستخدم..."
+          placeholder={tr("ابحث عن مستخدم...")}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full pr-10 pl-4 py-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#D4AF37] font-['Cairo']"
@@ -337,7 +338,7 @@ export default function AdminPage() {
       {/* قائمة المستخدمين */}
       <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5">
         <h2 className="text-xl font-bold font-['Amiri'] text-[var(--text-primary)] mb-4">
-          المستخدمون ({filteredUsers.length})
+          {tr(" المستخدمون (")}{filteredUsers.length})
         </h2>
         <div className="space-y-2">
           {filteredUsers.map((userStat) => (
@@ -352,7 +353,7 @@ export default function AdminPage() {
                 </div>
                 <div>
                   <div className="font-bold text-[var(--text-primary)] font-['Cairo']">
-                    {userStat.profile.full_name || 'بدون اسم'}
+                    {userStat.profile.full_name || tr('بدون اسم')}
                   </div>
                   <div className="text-xs text-[var(--text-muted)] font-['Cairo'] flex items-center gap-1">
                     <Mail className="w-3 h-3" /> {userStat.profile.email}
@@ -360,33 +361,32 @@ export default function AdminPage() {
                 </div>
                 {userStat.profile.role === 'admin' && (
                   <span className="text-xs px-2 py-1 rounded-full bg-[#D4AF37]/20 text-[#D4AF37] font-['Cairo']">
-                    أدمن
-                  </span>
+                    {tr(" أدمن ")}</span>
                 )}
               </div>
               <div className="flex gap-4 text-sm text-[var(--text-secondary)] font-['Cairo'] mx-4">
-                <span>{userStat.totalSchedules} جدول</span>
-                <span>{userStat.totalTasks} مهمة</span>
+                <span>{userStat.totalSchedules} {tr(" جدول")}</span>
+                <span>{userStat.totalTasks} {tr(" مهمة")}</span>
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => setSelectedUser(userStat)}
                   className="p-2 rounded-lg hover:bg-white/10 text-[var(--text-secondary)]"
-                  title="عرض الجداول"
+                  title={tr("عرض الجداول")}
                 >
                   <Eye className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => handleToggleAdmin(userStat.profile.id, userStat.profile.role)}
                   className={`p-2 rounded-lg hover:bg-white/10 ${userStat.profile.role === 'admin' ? 'text-yellow-500' : 'text-blue-400'}`}
-                  title={userStat.profile.role === 'admin' ? 'إزالة صلاحية الأدمن' : 'ترقية لأدمن'}
+                  title={userStat.profile.role === 'admin' ? tr('إزالة صلاحية الأدمن') : tr('ترقية لأدمن')}
                 >
                   <Shield className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => handleDeleteUser(userStat.profile.id)}
                   className="p-2 rounded-lg hover:bg-red-500/10 text-red-400"
-                  title="حذف المستخدم"
+                  title={tr("حذف المستخدم")}
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -415,7 +415,7 @@ export default function AdminPage() {
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold font-['Amiri'] text-[var(--text-primary)]">
-                  جداول {selectedUser.profile.full_name || selectedUser.profile.email}
+                  {tr(" جداول ")}{selectedUser.profile.full_name || selectedUser.profile.email}
                 </h3>
                 <button
                   onClick={() => setSelectedUser(null)}
@@ -427,8 +427,7 @@ export default function AdminPage() {
 
               {selectedUser.schedules.length === 0 ? (
                 <p className="text-center text-[var(--text-muted)] font-['Cairo'] py-8">
-                  لا توجد جداول
-                </p>
+                  {tr(" لا توجد جداول ")}</p>
               ) : (
                 <div className="space-y-3">
                   {selectedUser.schedules.map((schedule) => (
@@ -441,12 +440,20 @@ export default function AdminPage() {
                           {schedule.title}
                         </span>
                         <span className="text-xs text-[var(--text-muted)] font-['Cairo']">
-                          {new Date(schedule.day).toLocaleDateString('ar-EG')}
+                          {new Date(schedule.day).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US')}
                         </span>
                       </div>
                       <div className="flex gap-4 mt-1 text-sm text-[var(--text-secondary)] font-['Cairo']">
-                        <span>{schedule.taskCount} مهمة</span>
-                        <span>{schedule.completedSessions} جلسة منجزة</span>
+                        <span>{schedule.taskCount} {tr(" مهمة")}</span>
+                        <span>{schedule.completedSessions} {tr(" جلسة منجزة")}</span>
+                      </div>
+                      <div className="overflow-x-auto mt-3">
+                        <table className="w-full text-sm text-start">
+                          <thead><tr><th>{tr("المهمة")}</th><th>{tr("الحالة")}</th><th>{tr("الجلسات المنجزة")}</th></tr></thead>
+                          <tbody>{schedule.tasks.map(task => <tr key={task.id}>
+                            <td className="p-2">{task.name}</td><td>{task.done ? 'done' : 'pending'}</td><td>{task.completed_sessions ?? 0}</td>
+                          </tr>)}</tbody>
+                        </table>
                       </div>
                     </div>
                   ))}
@@ -476,8 +483,7 @@ export default function AdminPage() {
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold font-['Amiri'] text-[var(--text-primary)]">
-                  إرسال إشعار جماعي
-                </h3>
+                  {tr(" إرسال إشعار جماعي ")}</h3>
                 <button
                   onClick={() => setShowBroadcast(false)}
                   className="p-1 rounded-lg hover:bg-white/10 text-[var(--text-secondary)]"
@@ -488,7 +494,7 @@ export default function AdminPage() {
               <textarea
                 value={broadcastMessage}
                 onChange={(e) => setBroadcastMessage(e.target.value)}
-                placeholder="نص الإشعار..."
+                placeholder={tr("نص الإشعار...")}
                 className="w-full px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:border-[#D4AF37] font-['Cairo'] min-h-[120px]"
               />
               <button
@@ -496,8 +502,7 @@ export default function AdminPage() {
                 className="mt-4 w-full py-3 rounded-xl bg-[#D4AF37] text-[#0b1a2e] font-bold hover:shadow-lg hover:shadow-[#D4AF37]/30 transition-all font-['Cairo'] flex items-center justify-center gap-2"
               >
                 <Send className="w-5 h-5" />
-                إرسال للجميع
-              </button>
+                {tr(" إرسال للجميع ")}</button>
             </motion.div>
           </motion.div>
         )}
@@ -507,6 +512,8 @@ export default function AdminPage() {
 }
 
 function StatCard({ icon: Icon, value, label, color = 'gold' }: any) {
+  const { t: tr, language } = useLanguage()
+
   const colors: any = {
     gold: 'from-[#D4AF37]/20 to-[#D4AF37]/5 text-[#D4AF37]',
     blue: 'from-blue-500/20 to-blue-500/5 text-blue-400',
@@ -523,7 +530,7 @@ function StatCard({ icon: Icon, value, label, color = 'gold' }: any) {
     >
       <Icon className="w-8 h-8 mb-3" />
       <div className="text-3xl font-bold text-[var(--text-primary)] font-['Amiri']">{value}</div>
-      <div className="text-sm text-[var(--text-secondary)] font-['Cairo']">{label}</div>
+      <div className="text-sm text-[var(--text-secondary)] font-['Cairo']">{tr(label)}</div>
     </motion.div>
   )
 }

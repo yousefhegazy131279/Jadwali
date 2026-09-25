@@ -1,6 +1,7 @@
-// src/app/(dashboard)/schedule/page.tsx
 'use client'
-
+import { formatTime12 } from '@/lib/time'
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
+// src/app/(dashboard)/schedule/page.tsx
 import { useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
@@ -25,7 +26,7 @@ import {
   Filter,
 } from 'lucide-react'
 import { format } from 'date-fns'
-import { ar } from 'date-fns/locale'
+import { ar, enUS } from 'date-fns/locale'
 import { useTimer } from '@/context/TimerContext'
 
 type Schedule = {
@@ -87,7 +88,9 @@ function ScheduleCard({
   onView: () => void
   onDelete: () => void
 }) {
-  const formattedDate = format(new Date(schedule.day), 'EEEE، d MMMM yyyy', { locale: ar })
+  const { t: tr, language } = useLanguage()
+
+  const formattedDate = format(new Date(schedule.day), 'EEEE، d MMMM yyyy', { locale: language === 'ar' ? ar : enUS })
   const progress = taskCount > 0 ? Math.round((completedTasks / taskCount) * 100) : 0
   const isPast = schedule.day < getLocalToday() && !isToday
 
@@ -119,13 +122,11 @@ function ScheduleCard({
               </h3>
               {isToday && (
                 <span className="text-xs px-2.5 py-1 rounded-full bg-[#D4AF37] text-[#0b1a2e] font-['Cairo'] animate-pulse shadow-sm">
-                  ✅ اليوم
-                </span>
+                  {tr(" ✅ اليوم ")}</span>
               )}
               {isPast && !isToday && (
                 <span className="text-xs px-2.5 py-1 rounded-full bg-white/10 text-[var(--text-muted)] font-['Cairo']">
-                  📅 منتهي
-                </span>
+                  {tr(" 📅 منتهي ")}</span>
               )}
             </div>
             <div className="flex items-center gap-3 mt-2 text-sm text-[var(--text-secondary)]">
@@ -135,7 +136,7 @@ function ScheduleCard({
               </span>
               <span className="flex items-center gap-1 font-['Cairo']">
                 <Clock className="w-4 h-4 text-[#D4AF37]" />
-                {schedule.start_time}
+                {formatTime12(schedule.start_time, language)}
               </span>
             </div>
           </div>
@@ -145,14 +146,14 @@ function ScheduleCard({
             <button
               onClick={(e) => { e.stopPropagation(); onView() }}
               className="p-2 rounded-lg hover:bg-[#D4AF37]/10 text-[var(--text-secondary)] hover:text-[#D4AF37] transition-colors"
-              title="عرض"
+              title={tr("عرض")}
             >
               <Eye className="w-5 h-5" />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onDelete() }}
               className="p-2 rounded-lg hover:bg-red-500/10 text-[var(--text-secondary)] hover:text-red-400 transition-colors"
-              title="حذف"
+              title={tr("حذف")}
             >
               <Trash2 className="w-5 h-5" />
             </button>
@@ -162,7 +163,7 @@ function ScheduleCard({
         {/* شريط التقدم */}
         <div className="mt-4 space-y-2">
           <div className="flex justify-between text-xs text-[var(--text-muted)] font-['Cairo']">
-            <span>المهام المكتملة</span>
+            <span>{tr("المهام المكتملة")}</span>
             <span>{completedTasks}/{taskCount}</span>
           </div>
           <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
@@ -177,8 +178,8 @@ function ScheduleCard({
 
         {/* معلومات إضافية */}
         <div className="mt-3 flex items-center justify-between text-xs text-[var(--text-muted)] font-['Cairo']">
-          <span>⏱️ {schedule.pomodoro.workDuration}د/جلسة</span>
-          <span>📚 {taskCount} مهام</span>
+          <span>⏱️ {schedule.pomodoro.workDuration}{tr("د/جلسة")}</span>
+          <span>📚 {taskCount} {tr(" مهام")}</span>
         </div>
       </div>
     </motion.div>
@@ -189,6 +190,8 @@ function ScheduleCard({
 //  الصفحة الرئيسية للجدول (محسّنة)
 // ============================================================
 export default function SchedulePage() {
+  const { t: tr, language } = useLanguage()
+
   const { user } = useSupabase()
   const router = useRouter()
   const { resetTimer, timerState } = useTimer()
@@ -255,7 +258,7 @@ export default function SchedulePage() {
   }
 
   const handleDeleteSchedule = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الجدول؟ سيتم حذف جميع مهامه وصلواته.')) return
+    if (!confirm(tr('هل أنت متأكد من حذف هذا الجدول؟ سيتم حذف جميع مهامه وصلواته.'))) return
 
     setDeleting(id)
     const supabase = createClient()
@@ -269,14 +272,14 @@ export default function SchedulePage() {
 
       if (timerState.scheduleId === id) {
         resetTimer()
-        toast.info('تم إيقاف المؤقت المرتبط بالجدول المحذوف.')
+        toast.info(tr('تم إيقاف المؤقت المرتبط بالجدول المحذوف.'))
       }
 
       setSchedules(schedules.filter(s => s.id !== id))
-      toast.success('🗑️ تم حذف الجدول بنجاح')
+      toast.success(tr('🗑️ تم حذف الجدول بنجاح'))
     } catch (error) {
       console.error(error)
-      toast.error('حدث خطأ أثناء حذف الجدول')
+      toast.error(tr('حدث خطأ أثناء حذف الجدول'))
     } finally {
       setDeleting(null)
     }
@@ -321,7 +324,7 @@ export default function SchedulePage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6" dir="rtl">
+    <div className="p-4 sm:p-2 sm:p-6 space-y-6" >
       {/* الهيدر */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -331,19 +334,16 @@ export default function SchedulePage() {
       >
         <div>
           <h1 className="text-3xl sm:text-4xl font-bold font-['Amiri'] text-[var(--text-primary)]">
-            ⏰ الجداول
-          </h1>
+            {tr(" ⏰ الجداول ")}</h1>
           <p className="text-[var(--text-secondary)] text-sm font-['Cairo'] mt-1">
-            {schedules.length} جدول • {tasks.length} مهمة
-          </p>
+            {schedules.length} {tr(" جدول • ")}{tasks.length} {tr(" مهمة ")}</p>
         </div>
         <button
           onClick={() => router.push('/dashboard/planner')}
           className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#E8C84A] text-[#0b1a2e] font-bold hover:shadow-lg hover:shadow-[#D4AF37]/30 transition-all duration-300 font-['Cairo']"
         >
           <Plus className="w-5 h-5" />
-          جدول جديد
-        </button>
+          {tr(" جدول جديد ")}</button>
       </motion.div>
 
       {/* شريط الأدوات */}
@@ -352,7 +352,7 @@ export default function SchedulePage() {
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
           <input
             type="text"
-            placeholder="ابحث عن جدول..."
+            placeholder={tr("ابحث عن جدول...")}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pr-10 pl-4 py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#D4AF37] transition-all font-['Cairo']"
@@ -360,10 +360,10 @@ export default function SchedulePage() {
         </div>
         <div className="flex gap-1 overflow-x-auto">
           {[
-            { value: 'all', label: 'الكل' },
-            { value: 'today', label: 'اليوم' },
-            { value: 'upcoming', label: 'القادمة' },
-            { value: 'past', label: 'المنتهية' },
+            { value: 'all', label: tr('الكل') },
+            { value: 'today', label: tr('اليوم') },
+            { value: 'upcoming', label: tr('القادمة') },
+            { value: 'past', label: tr('المنتهية') },
           ].map(f => (
             <button
               key={f.value}
@@ -390,12 +390,12 @@ export default function SchedulePage() {
         >
           <Calendar className="w-20 h-20 text-[var(--text-muted)]/20 mb-4" />
           <h3 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">
-            لا توجد جداول {filter !== 'all' ? 'مطابقة' : ''}
+            {tr(" لا توجد جداول ")}{filter !== 'all' ? tr('مطابقة') : ''}
           </h3>
           <p className="text-[var(--text-secondary)] font-['Cairo'] mt-2">
             {schedules.length === 0
-              ? 'أنشئ جدولك الأول من خلال المخطط الذكي'
-              : 'جرّب تغيير معايير البحث أو الفلترة'}
+              ? tr('أنشئ جدولك الأول من خلال المخطط الذكي')
+              : tr('جرّب تغيير معايير البحث أو الفلترة')}
           </p>
           {schedules.length === 0 && (
             <button
@@ -403,8 +403,7 @@ export default function SchedulePage() {
               className="mt-6 px-8 py-3 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#E8C84A] text-[#0b1a2e] font-bold hover:shadow-lg hover:shadow-[#D4AF37]/30 transition-all duration-300 font-['Cairo']"
             >
               <Plus className="w-5 h-5 inline ml-2" />
-              أنشئ جدولاً
-            </button>
+              {tr(" أنشئ جدولاً ")}</button>
           )}
         </motion.div>
       ) : (

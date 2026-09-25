@@ -47,20 +47,20 @@ export const tourSteps: TourStep[] = [
   // ========== المخطط ==========
   {
     path: '/dashboard/planner',
-    selector: 'input[placeholder="مثال: يوم عمل مكثف"]',
+    selector: '[data-tour="planner-title"]',
     title: 'أدخل عنوان الجدول',
     description: 'اكتب اسم الجدول في هذا الحقل المظلل.',
     action: 'input',
-    actionTarget: 'input[placeholder="مثال: يوم عمل مكثف"]',
+    actionTarget: '[data-tour="planner-title"]',
     required: true,
   },
   {
     path: '/dashboard/planner',
-    selector: 'input[placeholder="اسم المهمة"]',
+    selector: '[data-tour="planner-task"]',
     title: 'أدخل اسم المهمة',
     description: 'اكتب اسم المهمة الأولى هنا.',
     action: 'input',
-    actionTarget: 'input[placeholder="اسم المهمة"]',
+    actionTarget: '[data-tour="planner-task"]',
     required: true,
   },
   {
@@ -83,13 +83,13 @@ export const tourSteps: TourStep[] = [
   },
   {
     path: '/dashboard/planner',
-    selector: 'button[type="submit"]',
+    selector: '[data-tour="planner-create"]',
     title: 'إنشاء الجدول',
     description: 'اضغط زر "إنشاء الجدول".',
     action: 'click',
-    actionTarget: 'button[type="submit"]',
+    actionTarget: '[data-tour="planner-create"]',
     required: true,
-    autoNextPath: '/dashboard/schedule',
+    autoNextPathPrefix: '/dashboard/schedule/',
   },
 
   // ========== صفحة الجداول ==========

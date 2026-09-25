@@ -1,5 +1,5 @@
 'use client'
-
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSupabase } from '@/lib/supabaseProvider'
@@ -29,10 +29,15 @@ const navItems = [
   { href: '/dashboard/planner', icon: Calendar, label: 'المخطط' },
   { href: '/dashboard/schedule', icon: Clock, label: 'الجدول' },
   { href: '/dashboard/workspace', icon: FolderOpen, label: 'المهام' },
+  { href: '/dashboard/projects', icon: FolderOpen, label: 'المشاريع' },
+  { href: '/dashboard/shared', icon: User, label: 'المشترك' },
+  { href: '/dashboard/analytics', icon: LayoutDashboard, label: 'الإحصائيات' },
   { href: '/dashboard/settings', icon: Settings, label: 'الإعدادات' },
 ]
 
 export const Sidebar = memo(function Sidebar() {
+  const { t: tr, language } = useLanguage()
+
   const pathname = usePathname()
   const { supabase, user, isAdmin } = useSupabase()
   const { theme, toggleTheme } = useTheme()
@@ -51,10 +56,20 @@ export const Sidebar = memo(function Sidebar() {
     setMobileOpen(false)
   }, [pathname])
 
+  useEffect(() => {
+    if (!mobileOpen) return
+    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') setMobileOpen(false) }
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', key)
+    return () => { document.body.style.overflow = previous; window.removeEventListener('keydown', key) }
+  }, [mobileOpen])
+
   const toggleSidebar = () => {
     const newState = !isCollapsed
     setIsCollapsed(newState)
     localStorage.setItem('sidebar-collapsed', String(newState))
+    window.dispatchEvent(new Event('storage'))
   }
 
   const handleLogout = async () => {
@@ -73,9 +88,9 @@ export const Sidebar = memo(function Sidebar() {
     <>
       {/* زر الهمبرغر للموبايل */}
       <button
-        className="md:hidden fixed top-4 right-4 z-[1100] p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] shadow-lg backdrop-blur-xl"
-        onClick={() => setMobileOpen(prev => !prev)}
-        aria-label={mobileOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
+        className="md:hidden fixed top-4 start-4 z-[1100] p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] shadow-lg backdrop-blur-xl"
+        aria-expanded={mobileOpen} aria-controls="dashboard-sidebar" onClick={() => setMobileOpen(prev => !prev)}
+        aria-label={mobileOpen ? tr('إغلاق القائمة') : tr('فتح القائمة')}
       >
         {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
       </button>
@@ -94,15 +109,15 @@ export const Sidebar = memo(function Sidebar() {
       </AnimatePresence>
 
       {/* الشريط الجانبي */}
-      <motion.aside
+      <motion.aside id="dashboard-sidebar"
         initial={{ x: 20, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ duration: 0.3 }}
         className={`
-          fixed top-0 right-0 h-screen bg-[var(--bg-card)] backdrop-blur-xl border-l border-[var(--border-color)] p-4 flex flex-col z-[1060] transition-all duration-300 shadow-lg
+          sidebar-panel fixed top-0 start-0 h-dvh bg-[var(--bg-card)] backdrop-blur-xl border-l border-[var(--border-color)] p-4 flex flex-col z-[1060] transition-all duration-300 shadow-lg
           ${isCollapsed ? 'md:w-20' : 'md:w-64'}
-          w-72
-          ${mobileOpen ? 'translate-x-0' : 'translate-x-full'}
+          w-[min(18rem,90vw)] overflow-y-auto
+          ${mobileOpen ? 'translate-x-0' : 'rtl:translate-x-full ltr:-translate-x-full'}
           md:translate-x-0
         `}
       >
@@ -111,7 +126,7 @@ export const Sidebar = memo(function Sidebar() {
           <button
             onClick={() => setMobileOpen(false)}
             className="p-2 rounded-lg hover:bg-white/10 transition-colors text-[var(--text-secondary)]"
-            aria-label="إغلاق القائمة"
+            aria-label={tr("إغلاق القائمة")}
           >
             <X className="w-5 h-5" />
           </button>
@@ -122,7 +137,7 @@ export const Sidebar = memo(function Sidebar() {
           <button
             onClick={toggleSidebar}
             className="p-2 rounded-lg hover:bg-white/10 transition-colors text-[var(--text-secondary)] hover:text-[#D4AF37]"
-            aria-label={isCollapsed ? 'توسيع القائمة' : 'تقليص القائمة'}
+            aria-label={isCollapsed ? tr('توسيع القائمة') : tr('تقليص القائمة')}
           >
             {isCollapsed ? (
               <PanelLeftOpen className="w-5 h-5" />
@@ -147,6 +162,7 @@ export const Sidebar = memo(function Sidebar() {
           </motion.div>
         </Link>
 
+        <LanguageToggle />
         {/* قائمة التنقل */}
         <nav className="flex-1 space-y-1 overflow-y-auto">
           {navItems.map(({ href, icon: Icon, label }) => {
@@ -162,7 +178,7 @@ export const Sidebar = memo(function Sidebar() {
                   } ${isCollapsed && !mobileOpen ? 'md:justify-center' : ''}`}
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
-                  {(!isCollapsed || mobileOpen) && <span>{label}</span>}
+                  {(!isCollapsed || mobileOpen) && <span>{tr(label)}</span>}
                   {active && (!isCollapsed || mobileOpen) && (
                     <motion.span
                       layoutId="active-indicator"
@@ -186,7 +202,7 @@ export const Sidebar = memo(function Sidebar() {
                 } ${isCollapsed && !mobileOpen ? 'md:justify-center' : ''}`}
               >
                 <Shield className="w-5 h-5 flex-shrink-0" />
-                {(!isCollapsed || mobileOpen) && <span>لوحة الأدمن</span>}
+                {(!isCollapsed || mobileOpen) && <span>{tr("لوحة الأدمن")}</span>}
               </motion.div>
             </Link>
           )}
@@ -203,12 +219,12 @@ export const Sidebar = memo(function Sidebar() {
             {theme === 'dark' ? (
               <>
                 <Sun className="w-5 h-5 flex-shrink-0" />
-                {(!isCollapsed || mobileOpen) && <span>الوضع الفاتح</span>}
+                {(!isCollapsed || mobileOpen) && <span>{tr("الوضع الفاتح")}</span>}
               </>
             ) : (
               <>
                 <Moon className="w-5 h-5 flex-shrink-0" />
-                {(!isCollapsed || mobileOpen) && <span>الوضع الداكن</span>}
+                {(!isCollapsed || mobileOpen) && <span>{tr("الوضع الداكن")}</span>}
               </>
             )}
           </button>
@@ -229,7 +245,7 @@ export const Sidebar = memo(function Sidebar() {
             }`}
           >
             <LogOut className="w-5 h-5 flex-shrink-0" />
-            {(!isCollapsed || mobileOpen) && <span>تسجيل الخروج</span>}
+            {(!isCollapsed || mobileOpen) && <span>{tr("تسجيل الخروج")}</span>}
           </button>
         </div>
       </motion.aside>

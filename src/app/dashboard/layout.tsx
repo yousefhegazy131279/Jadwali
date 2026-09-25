@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { Sidebar } from '@/components/Sidebar'
 import { Footer } from '@/components/Footer'
 import { NeonParticles } from '@/components/NeonParticles'
+import { FloatingTimer } from '@/components/FloatingTimer'
+import Onboarding from '@/components/Onboarding'
 import { TimerProvider } from '@/context/TimerContext'
 import AOS from 'aos'
 import 'aos/dist/aos.css'
@@ -47,14 +49,16 @@ export default function DashboardLayout({
         </div>
 
         <Sidebar />
+        <Onboarding />
+        <FloatingTimer />
 
         {/* المحتوى الرئيسي: flex column لضمان ظهور الفوتر في الأسفل */}
         <main
           className={`relative z-10 min-h-screen flex flex-col transition-all duration-300 ${
-            isCollapsed ? 'md:pr-20' : 'md:pr-64'
+            isCollapsed ? 'md:ps-20' : 'md:ps-64'
           } pr-0`}
         >
-          <div className="flex-1 p-4 sm:p-6">
+          <div className="flex-1 min-w-0 px-2 pt-20 pb-4 sm:px-4 md:pt-6">
             {children}
           </div>
           {/* الفوتر يظهر دائمًا أسفل المحتوى */}

@@ -1,9 +1,9 @@
+'use client'
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
 // ============================================================
 //  src/app/(dashboard)/projects/page.tsx
 //  نسخة نهائية مع زر "تفاصيل" ظاهر دائماً
 // ============================================================
-'use client'
-
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
@@ -34,17 +34,24 @@ function ProjectCard({
   onDelete: (id: string) => void
   onEdit: (project: Project) => void
 }) {
+  const { t: tr, language } = useLanguage()
+
   const [taskCount, setTaskCount] = useState(0)
+  const [scheduleCount, setScheduleCount] = useState(0)
+  const [progress, setProgress] = useState(0)
   const supabase = createClient()
 
   useEffect(() => {
     const fetchTaskCount = async () => {
-      const { count } = await supabase
-        .from('tasks')
-        .select('*', { count: 'exact', head: true })
-        .eq('project_id', project.id)
-        .eq('done', false)
-      setTaskCount(count || 0)
+      const { data, error } = await supabase.from('schedules').select('id,tasks(id,done,completed_sessions,duration),pomodoro').eq('project_id',project.id)
+      if (error) { toast.error(tr('تعذر تحميل تقدم المشروع')); return }
+      let total=0, completed=0, pending=0
+      for (const schedule of data ?? []) for (const task of schedule.tasks ?? []) {
+        const sessions=task.duration>0?Math.ceil(task.duration/(schedule.pomodoro?.workDuration||50)):1
+        total+=sessions; completed+=task.duration>0?Math.min(task.completed_sessions??0,sessions):Number(task.done)
+        if(!task.done)pending++
+      }
+      setTaskCount(pending); setScheduleCount(data?.length??0); setProgress(total?Math.round(completed/total*100):0)
     }
     fetchTaskCount()
   }, [project.id, supabase])
@@ -81,7 +88,7 @@ function ProjectCard({
                 {project.name}
               </h3>
               <p className="text-xs text-[var(--text-muted)] font-['Cairo']">
-                {taskCount} مهام متبقية
+                {scheduleCount} {tr(" جداول · ")}{taskCount} {tr(" مهام متبقية · ")}{progress}%
               </p>
             </div>
           </div>
@@ -120,7 +127,7 @@ function ProjectCard({
 
         {/* تاريخ الإنشاء */}
         <p className="text-xs text-[var(--text-muted)] mt-3 font-['Cairo']">
-          تاريخ الإنشاء: {new Date(project.created_at).toLocaleDateString('ar-EG')}
+          {tr(" تاريخ الإنشاء: ")}{new Date(project.created_at).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US')}
         </p>
 
         {/* شريط التقدم السفلي */}
@@ -129,7 +136,7 @@ function ProjectCard({
             className="h-full rounded-full"
             style={{ backgroundColor: project.color }}
             initial={{ width: 0 }}
-            animate={{ width: `${Math.min(taskCount * 20, 100)}%` }}
+            animate={{ width: `${progress}%` }}
             transition={{ duration: 1, delay: 0.3 }}
           />
         </div>
@@ -142,8 +149,7 @@ function ProjectCard({
               whileTap={{ scale: 0.95 }}
               className="px-4 py-1.5 rounded-lg bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/30 hover:bg-[#D4AF37]/20 transition-all duration-300 text-sm font-['Cairo'] flex items-center gap-2"
             >
-              تفاصيل المشروع
-              <ArrowRight className="w-3 h-3" />
+              {tr(" تفاصيل المشروع ")}<ArrowRight className="w-3 h-3" />
             </motion.button>
           </Link>
         </div>
@@ -168,6 +174,8 @@ function ProjectModal({
   editingProject?: Project | null
   isLoading: boolean
 }) {
+  const { t: tr, language } = useLanguage()
+
   const [name, setName] = useState('')
   const [color, setColor] = useState('#D4AF37')
 
@@ -201,7 +209,7 @@ function ProjectModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (name.trim().length < 2) {
-      toast.error('اسم المشروع يجب أن يكون حرفين على الأقل')
+      toast.error(tr('اسم المشروع يجب أن يكون حرفين على الأقل'))
       return
     }
     await onSave(name.trim(), color)
@@ -228,7 +236,7 @@ function ProjectModal({
               )}
             </div>
             <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">
-              {editingProject ? 'تعديل المشروع' : 'مشروع جديد'}
+              {editingProject ? tr('تعديل المشروع') : tr('مشروع جديد')}
             </h2>
           </div>
           <button
@@ -242,23 +250,21 @@ function ProjectModal({
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2 font-['Cairo']">
-              اسم المشروع
-            </label>
+              {tr(" اسم المشروع ")}</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="أدخل اسم المشروع..."
+              placeholder={tr("أدخل اسم المشروع...")}
               className="w-full px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#D4AF37] transition-all duration-300 font-['Cairo']"
-              dir="rtl"
+
               autoFocus
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2 font-['Cairo']">
-              لون المشروع
-            </label>
+              {tr(" لون المشروع ")}</label>
             <div className="flex flex-wrap gap-3">
               {colors.map((c) => (
                 <button
@@ -280,8 +286,7 @@ function ProjectModal({
               onClick={onClose}
               className="flex-1 py-3 rounded-xl bg-white/5 text-[var(--text-secondary)] hover:bg-white/10 transition-colors font-['Cairo']"
             >
-              إلغاء
-            </button>
+              {tr(" إلغاء ")}</button>
             <button
               type="submit"
               disabled={isLoading || name.trim().length < 2}
@@ -292,7 +297,7 @@ function ProjectModal({
               ) : (
                 <>
                   {editingProject ? <Check className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                  {editingProject ? 'تحديث' : 'إضافة'}
+                  {editingProject ? tr('تحديث') : tr('إضافة')}
                 </>
               )}
             </button>
@@ -307,6 +312,8 @@ function ProjectModal({
 //  الصفحة الرئيسية للمشاريع
 // ============================================================
 export default function ProjectsPage() {
+  const { t: tr, language } = useLanguage()
+
   const { user } = useSupabase()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
@@ -338,7 +345,7 @@ export default function ProjectsPage() {
       .order('created_at', { ascending: false })
 
     if (error) {
-      toast.error('حدث خطأ في تحميل المشاريع')
+      toast.error(tr('حدث خطأ في تحميل المشاريع'))
       console.error('Error fetching projects:', error)
     } else {
       setProjects(data || [])
@@ -363,11 +370,11 @@ export default function ProjectsPage() {
       .single()
 
     if (error) {
-      toast.error('حدث خطأ في إضافة المشروع')
+      toast.error(tr('حدث خطأ في إضافة المشروع'))
       console.error('Error adding project:', error)
     } else {
       setProjects([data, ...projects])
-      toast.success('✅ تم إضافة المشروع بنجاح')
+      toast.success(tr('✅ تم إضافة المشروع بنجاح'))
       setIsModalOpen(false)
       setEditingProject(null)
     }
@@ -392,11 +399,11 @@ export default function ProjectsPage() {
       .single()
 
     if (error) {
-      toast.error('حدث خطأ في تعديل المشروع')
+      toast.error(tr('حدث خطأ في تعديل المشروع'))
       console.error('Error editing project:', error)
     } else {
       setProjects(projects.map((p) => (p.id === editingProject.id ? data : p)))
-      toast.success('✅ تم تعديل المشروع بنجاح')
+      toast.success(tr('✅ تم تعديل المشروع بنجاح'))
       setIsModalOpen(false)
       setEditingProject(null)
     }
@@ -404,17 +411,17 @@ export default function ProjectsPage() {
   }
 
   const handleDeleteProject = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا المشروع؟ سيتم حذف جميع المهام المرتبطة به.')) return
+    if (!confirm(tr('هل أنت متأكد من حذف هذا المشروع؟ سيتم حذف جميع المهام المرتبطة به.'))) return
 
     const supabase = createClient()
     const { error } = await supabase.from('projects').delete().eq('id', id)
 
     if (error) {
-      toast.error('حدث خطأ في حذف المشروع')
+      toast.error(tr('حدث خطأ في حذف المشروع'))
       console.error('Error deleting project:', error)
     } else {
       setProjects(projects.filter((p) => p.id !== id))
-      toast.success('🗑️ تم حذف المشروع بنجاح')
+      toast.success(tr('🗑️ تم حذف المشروع بنجاح'))
     }
   }
 
@@ -445,7 +452,7 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="p-6 space-y-6" dir="rtl">
+    <div className="p-6 space-y-6" >
       {/* ===== الهيدر ===== */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -455,11 +462,9 @@ export default function ProjectsPage() {
       >
         <div>
           <h1 className="text-3xl font-bold font-['Amiri'] text-[var(--text-primary)]">
-            المشاريع
-          </h1>
+            {tr(" المشاريع ")}</h1>
           <p className="text-[var(--text-secondary)] text-sm font-['Cairo'] mt-1">
-            {projects.length} مشاريع نشطة
-          </p>
+            {projects.length} {tr(" مشاريع نشطة ")}</p>
         </div>
 
         <motion.button
@@ -469,8 +474,7 @@ export default function ProjectsPage() {
           className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#D4AF37] text-[#0b1a2e] font-bold hover:shadow-lg hover:shadow-[#D4AF37]/30 transition-all duration-300 font-['Cairo']"
         >
           <Plus className="w-5 h-5" />
-          مشروع جديد
-        </motion.button>
+          {tr(" مشروع جديد ")}</motion.button>
       </motion.div>
 
       {/* ===== قائمة المشاريع ===== */}
@@ -483,11 +487,9 @@ export default function ProjectsPage() {
         >
           <FolderOpen className="w-20 h-20 text-[var(--text-muted)]/20 mb-4" />
           <h3 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">
-            لا توجد مشاريع
-          </h3>
+            {tr(" لا توجد مشاريع ")}</h3>
           <p className="text-[var(--text-secondary)] font-['Cairo'] mt-2">
-            ابدأ بإضافة مشروعك الأول لتنظيم مهامك
-          </p>
+            {tr(" ابدأ بإضافة مشروعك الأول لتنظيم مهامك ")}</p>
         </motion.div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

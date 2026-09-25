@@ -1,5 +1,5 @@
 'use client'
-
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Sparkles, User, Check } from 'lucide-react'
@@ -10,6 +10,8 @@ type NameModalProps = {
 }
 
 export function NameModal({ isOpen, onSave }: NameModalProps) {
+  const { t: tr, language } = useLanguage()
+
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -18,7 +20,7 @@ export function NameModal({ isOpen, onSave }: NameModalProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (name.trim().length < 2) {
-      alert('الرجاء إدخال اسم مكون من حرفين على الأقل')
+      alert(tr('الرجاء إدخال اسم مكون من حرفين على الأقل'))
       return
     }
     setLoading(true)
@@ -41,11 +43,10 @@ export function NameModal({ isOpen, onSave }: NameModalProps) {
             </div>
           </div>
           <h2 className="text-2xl font-bold text-[var(--text-primary)] font-['Amiri']">
-            مرحباً بك في <span className="text-[#D4AF37]">جَدْوَلِي</span>
+            {tr(" مرحباً بك في ")}<span className="text-[#D4AF37]">{tr("جَدْوَلِي")}</span>
           </h2>
           <p className="text-[var(--text-secondary)] text-sm mt-2 font-['Cairo']">
-            كيف نناديك؟ أدخل اسمك ليكون هوية لك في المنصة
-          </p>
+            {tr(" كيف نناديك؟ أدخل اسمك ليكون هوية لك في المنصة ")}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -55,10 +56,10 @@ export function NameModal({ isOpen, onSave }: NameModalProps) {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="أدخل اسمك..."
+              placeholder={tr("أدخل اسمك...")}
               className="w-full pr-10 pl-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#D4AF37] transition-all duration-300 font-['Cairo']"
               autoFocus
-              dir="rtl"
+
             />
           </div>
 
@@ -74,15 +75,13 @@ export function NameModal({ isOpen, onSave }: NameModalProps) {
             ) : (
               <>
                 <Check className="w-5 h-5" />
-                تأكيد الاسم
-              </>
+                {tr(" تأكيد الاسم ")}</>
             )}
           </motion.button>
         </form>
 
         <p className="text-xs text-[var(--text-muted)] text-center mt-4 font-['Cairo']">
-          يمكنك تغيير هذا الاسم لاحقاً من الإعدادات
-        </p>
+          {tr(" يمكنك تغيير هذا الاسم لاحقاً من الإعدادات ")}</p>
       </motion.div>
     </div>
   )

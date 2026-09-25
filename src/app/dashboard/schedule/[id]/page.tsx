@@ -1,10 +1,13 @@
 'use client'
-
+import { formatTime12 } from '@/lib/time'
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { useSupabase } from '@/lib/supabaseProvider'
+import SharingPanel, { type MemberProgress } from '@/components/SharingPanel'
+import { completedPhaseCount } from '@/lib/progress'
 import { useTimer } from '@/context/TimerContext'
 import AOS from 'aos'
 import 'aos/dist/aos.css'
@@ -32,7 +35,7 @@ import {
   Save,
 } from 'lucide-react'
 import { format } from 'date-fns'
-import { ar } from 'date-fns/locale'
+import { ar, enUS } from 'date-fns/locale'
 
 type Schedule = {
   id: string
@@ -154,14 +157,16 @@ function PhaseItem({
   totalDuration: number
   canComplete: boolean
 }) {
+  const { t: tr, language } = useLanguage()
+
   const progress = totalDuration > 0 ? ((totalDuration - timeLeft) / totalDuration) * 100 : 0
-  const startTimeStr = format(phase.startTime, 'h:mm a')
-  const endTimeStr = format(phase.endTime, 'h:mm a')
+  const startTimeStr = formatTime12(phase.startTime, language)
+  const endTimeStr = formatTime12(phase.endTime, language)
 
   const getPhaseLabel = () => {
-    if (phase.type === 'work') return `جلسة ${phase.sessionNumber || ''}`
-    if (phase.type === 'shortBreak') return 'راحة قصيرة'
-    if (phase.type === 'longBreak') return 'راحة طويلة'
+    if (phase.type === 'work') return `${tr('جلسة', 'Session')} ${phase.sessionNumber || ''}`
+    if (phase.type === 'shortBreak') return tr('راحة قصيرة')
+    if (phase.type === 'longBreak') return tr('راحة طويلة')
     return ''
   }
 
@@ -207,7 +212,7 @@ function PhaseItem({
         </motion.div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <motion.div whileHover={{ rotate: 15, scale: 1.1 }} className="flex-shrink-0">
             {getPhaseIcon()}
@@ -221,13 +226,13 @@ function PhaseItem({
                 {startTimeStr} → {endTimeStr}
               </span>
               <Tag className="w-3 h-3" />
-              {phase.type === 'work' ? 'دراسة' : phase.type === 'shortBreak' ? 'راحة' : 'راحة طويلة'}
+              {phase.type === 'work' ? tr('دراسة') : phase.type === 'shortBreak' ? tr('راحة') : tr('راحة طويلة')}
               <span className="text-[var(--text-muted)]">•</span>
               <Clock className="w-3 h-3" />
               {phase.duration > 0 && (
                 <>
                   <span className="text-[var(--text-muted)]">•</span>
-                  <span>{Math.floor(phase.duration / 60)} د</span>
+                  <span>{Math.floor(phase.duration / 60)} {tr(" د")}</span>
                 </>
               )}
             </div>
@@ -255,8 +260,7 @@ function PhaseItem({
               animate={{ scale: 1 }}
               className="text-xs px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 font-['Cairo'] flex items-center gap-1"
             >
-              <Check className="w-3 h-3" /> مكتملة
-            </motion.span>
+              <Check className="w-3 h-3" /> {tr(" مكتملة ")}</motion.span>
           ) : isActive ? (
             <>
               {isPaused ? (
@@ -266,8 +270,7 @@ function PhaseItem({
                   onClick={onResume}
                   className="px-3 py-1.5 rounded-lg bg-emerald-500 text-white font-bold text-sm flex items-center gap-1"
                 >
-                  <Play className="w-4 h-4" /> استئناف
-                </motion.button>
+                  <Play className="w-4 h-4" /> {tr(" استئناف ")}</motion.button>
               ) : (
                 <motion.button
                   whileHover={{ scale: 1.05 }}
@@ -275,8 +278,7 @@ function PhaseItem({
                   onClick={onPause}
                   className="px-3 py-1.5 rounded-lg bg-yellow-500 text-white font-bold text-sm flex items-center gap-1"
                 >
-                  <Pause className="w-4 h-4" /> إيقاف
-                </motion.button>
+                  <Pause className="w-4 h-4" /> {tr(" إيقاف ")}</motion.button>
               )}
               <motion.button
                 whileHover={canComplete ? { scale: 1.05 } : {}}
@@ -289,13 +291,11 @@ function PhaseItem({
                     : 'bg-gray-500/30 text-gray-400 cursor-not-allowed'
                 }`}
               >
-                <Check className="w-4 h-4" /> إنهاء
-              </motion.button>
+                <Check className="w-4 h-4" /> {tr(" إنهاء ")}</motion.button>
             </>
           ) : isLocked ? (
             <span className="text-xs px-3 py-1 rounded-full bg-white/5 text-[var(--text-muted)] font-['Cairo'] flex items-center gap-1">
-              <Clock className="w-3 h-3" /> انتظار
-            </span>
+              <Clock className="w-3 h-3" /> {tr(" انتظار ")}</span>
           ) : (
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -303,8 +303,7 @@ function PhaseItem({
               onClick={onStart}
               className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#E8C84A] text-[#0b1a2e] font-bold hover:shadow-lg hover:shadow-[#D4AF37]/30 transition-all duration-300 font-['Cairo'] text-sm flex items-center gap-1"
             >
-              <Play className="w-4 h-4" /> ابدأ
-            </motion.button>
+              <Play className="w-4 h-4" /> {tr(" ابدأ ")}</motion.button>
           )}
         </div>
       </div>
@@ -324,6 +323,8 @@ function PhaseItem({
 }
 
 function SideTaskItem({ task, onToggle }: { task: Task; onToggle: (id: string) => void }) {
+  const { t: tr, language } = useLanguage()
+
   return (
     <motion.div
       initial={{ opacity: 0, x: -10 }}
@@ -351,6 +352,8 @@ function SideTaskItem({ task, onToggle }: { task: Task; onToggle: (id: string) =
 }
 
 function CustomCardItem({ card, onDelete }: { card: CustomCard; onDelete: (id: string) => void }) {
+  const { t: tr, language } = useLanguage()
+
   const [completedItems, setCompletedItems] = useState<Set<number>>(new Set())
 
   const toggleItem = (index: number) => {
@@ -423,13 +426,15 @@ function AddSideTaskModal({
   onSave: (name: string) => Promise<void>
   isLoading: boolean
 }) {
+  const { t: tr, language } = useLanguage()
+
   const [name, setName] = useState('')
   useEffect(() => { if (!isOpen) setName('') }, [isOpen])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) {
-      toast.error('أدخل اسم العمل الجانبي')
+      toast.error(tr('أدخل اسم العمل الجانبي'))
       return
     }
     await onSave(name.trim())
@@ -446,7 +451,7 @@ function AddSideTaskModal({
         className="bg-[var(--bg-card)] backdrop-blur-xl border border-[var(--border-color)] rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl"
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">إضافة عمل جانبي</h2>
+          <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">{tr("إضافة عمل جانبي")}</h2>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10 text-[var(--text-secondary)] hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
@@ -454,7 +459,7 @@ function AddSideTaskModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
             type="text"
-            placeholder="اسم العمل الجانبي"
+            placeholder={tr("اسم العمل الجانبي")}
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="w-full px-4 py-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#D4AF37] font-['Cairo']"
@@ -468,8 +473,7 @@ function AddSideTaskModal({
             className="w-full py-3 rounded-xl bg-[#D4AF37] text-[#0b1a2e] font-bold hover:shadow-lg hover:shadow-[#D4AF37]/30 transition-all duration-300 font-['Cairo'] flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
-            إضافة
-          </motion.button>
+            {tr(" إضافة ")}</motion.button>
         </form>
       </motion.div>
     </div>
@@ -487,6 +491,8 @@ function AddCardModal({
   onSave: (title: string, items: string[]) => Promise<void>
   isLoading: boolean
 }) {
+  const { t: tr, language } = useLanguage()
+
   const [title, setTitle] = useState('')
   const [items, setItems] = useState<string[]>([''])
 
@@ -511,12 +517,12 @@ function AddCardModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) {
-      toast.error('أدخل عنواناً للكارد')
+      toast.error(tr('أدخل عنواناً للكارد'))
       return
     }
     const filteredItems = items.filter(i => i.trim().length > 0)
     if (filteredItems.length === 0) {
-      toast.error('أضف عنصراً واحداً على الأقل')
+      toast.error(tr('أضف عنصراً واحداً على الأقل'))
       return
     }
     await onSave(title.trim(), filteredItems)
@@ -533,7 +539,7 @@ function AddCardModal({
         className="bg-[var(--bg-card)] backdrop-blur-xl border border-[var(--border-color)] rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto"
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">إضافة كارد</h2>
+          <h2 className="text-xl font-bold text-[var(--text-primary)] font-['Amiri']">{tr("إضافة كارد")}</h2>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10 text-[var(--text-secondary)] hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
@@ -541,18 +547,18 @@ function AddCardModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-1">عنوان الكارد</label>
+            <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-1">{tr("عنوان الكارد")}</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="مثال: أذكار الصباح"
+              placeholder={tr("مثال: أذكار الصباح")}
               className="w-full px-4 py-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#D4AF37] font-['Cairo']"
             />
           </div>
 
           <div>
-            <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-1">العناصر (حتى 10)</label>
+            <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-1">{tr("العناصر (حتى 10)")}</label>
             <div className="space-y-2">
               {items.map((item, index) => (
                 <div key={index} className="flex items-center gap-2">
@@ -560,7 +566,7 @@ function AddCardModal({
                     type="text"
                     value={item}
                     onChange={(e) => updateItem(index, e.target.value)}
-                    placeholder={`عنصر ${index + 1}`}
+                    placeholder={`${tr('عنصر', 'Item')} ${index + 1}`}
                     className="flex-1 px-3 py-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#D4AF37] font-['Cairo'] text-sm"
                   />
                   {items.length > 1 && (
@@ -582,8 +588,7 @@ function AddCardModal({
                 className="mt-2 text-sm text-[#D4AF37] hover:underline font-['Cairo'] flex items-center gap-1"
               >
                 <Plus className="w-4 h-4" />
-                إضافة عنصر
-              </button>
+                {tr(" إضافة عنصر ")}</button>
             )}
           </div>
 
@@ -595,8 +600,7 @@ function AddCardModal({
             className="w-full py-3 rounded-xl bg-[#D4AF37] text-[#0b1a2e] font-bold hover:shadow-lg hover:shadow-[#D4AF37]/30 transition-all duration-300 font-['Cairo'] flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-            إضافة الكارد
-          </motion.button>
+            {tr(" إضافة الكارد ")}</motion.button>
         </form>
       </motion.div>
     </div>
@@ -604,6 +608,8 @@ function AddCardModal({
 }
 
 export default function ScheduleDetailPage() {
+  const { t: tr, language } = useLanguage()
+
   const { id } = useParams()
   const router = useRouter()
   const { user } = useSupabase()
@@ -616,6 +622,8 @@ export default function ScheduleDetailPage() {
     resumeTimer,
   } = useTimer()
 
+  const [memberRole, setMemberRole] = useState<string | null>(null)
+  const updateMembers = useCallback((members: MemberProgress[]) => setMemberRole(members.find(m => m.user_id === user?.id)?.role ?? null), [user?.id])
   const [loading, setLoading] = useState(true)
   const [schedule, setSchedule] = useState<Schedule | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
@@ -634,8 +642,6 @@ export default function ScheduleDetailPage() {
   const [currentTime, setCurrentTime] = useState(new Date())
   const today = new Date().toISOString().split('T')[0]
 
-  const prevPhaseIndexRef = useRef<number | null>(null)
-  const lastProcessedCompletedRef = useRef<number>(0)
 
   useEffect(() => {
     AOS.init({ duration: 600, easing: 'ease-out-cubic', once: true, mirror: true })
@@ -647,17 +653,16 @@ export default function ScheduleDetailPage() {
   useEffect(() => {
     setTimerVisibility(false)
     return () => {
-      setTimerVisibility(false)
+      setTimerVisibility(true)
     }
   }, [])
 
   useEffect(() => {
     if (timerState.scheduleId === id) {
       setCurrentPhaseIndex(timerState.currentPhaseIndex)
-      setCompletedCount(timerState.completedPhases || 0)
+      setCompletedCount(prev => Math.max(prev, timerState.completedPhases || 0))
     } else {
       setCurrentPhaseIndex(null)
-      setCompletedCount(0)
     }
   }, [timerState, id])
 
@@ -669,10 +674,9 @@ export default function ScheduleDetailPage() {
         .from('schedules')
         .select('*')
         .eq('id', id)
-        .eq('user_id', user.id)
         .single()
       if (scheduleError || !scheduleData) {
-        toast.error('الجدول غير موجود')
+        toast.error(tr('الجدول غير موجود'))
         router.push('/dashboard/schedule')
         return
       }
@@ -682,7 +686,6 @@ export default function ScheduleDetailPage() {
         .from('tasks')
         .select('*')
         .eq('schedule_id', id)
-        .eq('user_id', user.id)
         .order('created_at', { ascending: true })
       setTasks(tasksData || [])
 
@@ -690,7 +693,6 @@ export default function ScheduleDetailPage() {
         .from('prayers')
         .select('*')
         .eq('schedule_id', id)
-        .eq('user_id', user.id)
         .order('time', { ascending: true })
       setPrayers(prayersData || [])
 
@@ -698,14 +700,13 @@ export default function ScheduleDetailPage() {
         .from('custom_cards')
         .select('*')
         .eq('schedule_id', id)
-        .eq('user_id', user.id)
         .order('created_at', { ascending: true })
       setCustomCards(cardsData || [])
 
       generatePhases(tasksData || [], scheduleData, prayersData || [])
     } catch (error) {
       console.error(error)
-      toast.error('حدث خطأ في تحميل البيانات')
+      toast.error(tr('حدث خطأ في تحميل البيانات'))
     } finally {
       setLoading(false)
     }
@@ -727,7 +728,7 @@ export default function ScheduleDetailPage() {
       for (let i = 0; i < count; i++) {
         sessionCounter++
         const phaseStart = new Date(currentTime)
-        const phaseEnd = new Date(currentTime.getTime() + workDur * 60000)
+        const phaseEnd = new Date(currentTime.getTime() + Math.min(workDur, totalMinutes - i * workDur) * 60000)
         let hasPrayerConflict = false
         let prayerName = ''
         for (const prayer of prayersData) {
@@ -742,7 +743,7 @@ export default function ScheduleDetailPage() {
         }
         newPhases.push({
           type: 'work',
-          duration: workDur * 60,
+          duration: Math.min(workDur, totalMinutes - i * workDur) * 60,
           taskId: task.id,
           taskName: task.name,
           sessionNumber: sessionCounter,
@@ -789,134 +790,84 @@ export default function ScheduleDetailPage() {
 
     setPhases(newPhases)
 
-    let initialCompleted = 0
-    const taskSessionCounters: Record<string, number> = {}
-    newPhases.forEach((phase) => {
-      if (phase.type === 'work' && phase.taskId) {
-        const task = tasksData.find(t => t.id === phase.taskId)
-        if (task && task.completed_sessions) {
-          const completed = task.completed_sessions
-          const currentCount = taskSessionCounters[phase.taskId] || 0
-          if (currentCount < completed) {
-            initialCompleted++
-            taskSessionCounters[phase.taskId] = currentCount + 1
-          }
-        }
-      }
-    })
+    const initialCompleted = completedPhaseCount(newPhases, tasksData)
     setCompletedCount(initialCompleted)
-    setCurrentPhaseIndex(null)
-    lastProcessedCompletedRef.current = initialCompleted
   }
 
-  const updateTaskProgress = useCallback(async (taskId: string) => {
-    if (!taskId) return
-    const supabase = createClient()
-    try {
-      const { error } = await supabase.rpc('increment_completed_sessions', { task_id: taskId })
-      if (error) {
-        const { data: task, error: fetchError } = await supabase
-          .from('tasks')
-          .select('completed_sessions')
-          .eq('id', taskId)
-          .single()
-        if (!fetchError && task) {
-          const current = task.completed_sessions || 0
-          const newValue = current + 1
-          const { error: updateError } = await supabase
-            .from('tasks')
-            .update({ completed_sessions: newValue })
-            .eq('id', taskId)
-          if (updateError) console.error('Error updating task progress:', updateError)
-        } else {
-          console.error('Error fetching task for progress update:', fetchError)
-        }
-      }
-    } catch (e) {
-      console.error('Exception in updateTaskProgress:', e)
-    }
-  }, [])
-
   useEffect(() => {
-    if (timerState.scheduleId !== id) return
-    const currentCompleted = timerState.completedPhases || 0
-    const lastProcessed = lastProcessedCompletedRef.current
-
-    if (currentCompleted > lastProcessed && phases.length > 0) {
-      for (let i = lastProcessed; i < currentCompleted; i++) {
-        const completedPhase = phases[i]
-        if (completedPhase && completedPhase.type === 'work' && completedPhase.taskId) {
-          updateTaskProgress(completedPhase.taskId)
-        }
-      }
-      lastProcessedCompletedRef.current = currentCompleted
-    }
-  }, [timerState.completedPhases, timerState.scheduleId, id, phases, updateTaskProgress])
+    if (!user || !id) return
+    const supabase = createClient()
+    const refresh = () => { void fetchData() }
+    const channel = supabase.channel('schedule-progress-' + id).on('postgres_changes',
+      { event: '*', schema: 'public', table: 'tasks', filter: 'schedule_id=eq.' + id }, refresh).subscribe()
+    window.addEventListener('focus', refresh)
+    window.addEventListener('jadwali-progress', refresh)
+    const poll = setInterval(refresh, 15000)
+    return () => { clearInterval(poll); window.removeEventListener('focus', refresh); window.removeEventListener('jadwali-progress', refresh); void supabase.removeChannel(channel) }
+  }, [user?.id, id])
 
   const handleStartPhase = (index: number) => {
+    if (!canEdit) return
+    if (index !== Math.max(completedCount, timerState.scheduleId === id ? timerState.completedPhases : 0)) return
     if (currentPhaseIndex !== null && currentPhaseIndex !== index) {
-      toast.error('يجب إنهاء الجلسة الحالية أولاً')
+      toast.error(tr('يجب إنهاء الجلسة الحالية أولاً'))
       return
     }
     const phase = phases[index]
     if (!phase) return
     startGlobalTimer(schedule!.id, schedule!.title, phases, index)
     setCurrentPhaseIndex(index)
-    toast.success(`🎯 بدأت ${phase.type === 'work' ? `جلسة ${phase.sessionNumber}` : phase.type === 'shortBreak' ? 'راحة قصيرة' : 'راحة طويلة'}`)
+    toast.success(`🎯 ${tr('بدأت', 'Started')} ${phase.type === 'work' ? `${tr('جلسة', 'Session')} ${phase.sessionNumber}` : phase.type === 'shortBreak' ? tr('راحة قصيرة') : tr('راحة طويلة')}`)
   }
 
   const handleCompletePhase = (index: number) => {
     if (currentPhaseIndex !== index) return
     if (timerState.timeLeft > 0) {
-      toast.error('⛔ لا يمكن إنهاء الجلسة قبل انتهاء وقتها!')
+      toast.error(tr('⛔ لا يمكن إنهاء الجلسة قبل انتهاء وقتها!'))
       return
     }
-    const completedPhase = phases[index]
-    if (completedPhase && completedPhase.type === 'work' && completedPhase.taskId) {
-      updateTaskProgress(completedPhase.taskId)
-    }
     completeGlobalPhase()
-    playAlertSound()
-    toast.success(`✅ تم إنهاء المرحلة رقم ${index + 1}`)
   }
 
   const handleToggleSideTask = async (taskId: string) => {
+    if (!canEdit) return
     const task = tasks.find(t => t.id === taskId)
     if (!task) return
     const supabase = createClient()
     const { error } = await supabase.from('tasks').update({ done: !task.done }).eq('id', taskId)
-    if (error) toast.error('حدث خطأ في تحديث المهمة')
+    if (error) toast.error(tr('حدث خطأ في تحديث المهمة'))
     else setTasks(tasks.map(t => t.id === taskId ? { ...t, done: !t.done } : t))
   }
 
   const handleTogglePrayer = async (prayerId: string) => {
+    if (!canEdit) return
     const prayer = prayers.find(p => p.id === prayerId)
     if (!prayer) return
     const supabase = createClient()
     const { error } = await supabase.from('prayers').update({ done: !prayer.done }).eq('id', prayerId)
-    if (error) toast.error('حدث خطأ في تحديث الصلاة')
+    if (error) toast.error(tr('حدث خطأ في تحديث الصلاة'))
     else setPrayers(prayers.map(p => p.id === prayerId ? { ...p, done: !p.done } : p))
   }
 
   const handleAddSideTask = async (name: string) => {
-    if (!user || !schedule) return
+    if (!user || !schedule || !canEdit) return
     setIsSaving(true)
     const supabase = createClient()
     const { data, error } = await supabase.from('tasks').insert({
-      user_id: user.id,
+      user_id: schedule.user_id,
       schedule_id: schedule.id,
       name,
-      category: 'جانبي',
+      category: tr('جانبي'),
       duration: 0,
       type: 'side',
       priority: 'low',
       done: false,
       completed_sessions: 0,
     }).select().single()
-    if (error) toast.error('حدث خطأ في إضافة العمل الجانبي')
+    if (error) toast.error(tr('حدث خطأ في إضافة العمل الجانبي'))
     else {
       setTasks([...tasks, data])
-      toast.success('✅ تم إضافة العمل الجانبي')
+      toast.success(tr('✅ تم إضافة العمل الجانبي'))
       setIsAddSideTaskModalOpen(false)
     }
     setIsSaving(false)
@@ -925,7 +876,7 @@ export default function ScheduleDetailPage() {
 
 // تعديل handleAddCard بحيث لا تُنشئ مهامًا إضافية إطلاقًا
 const handleAddCard = async (title: string, items: string[], color?: string) => {
-  if (!user || !schedule) return
+  if (!user || !schedule || !canEdit) return
   setIsSaving(true)
   const supabase = createClient()
 
@@ -933,7 +884,7 @@ const handleAddCard = async (title: string, items: string[], color?: string) => 
   const { data, error } = await supabase
     .from('custom_cards')
     .insert({
-      user_id: user.id,
+      user_id: schedule.user_id,
       schedule_id: schedule.id,
       title,
       items,
@@ -945,11 +896,11 @@ const handleAddCard = async (title: string, items: string[], color?: string) => 
     .single()
 
   if (error) {
-    toast.error('حدث خطأ في إضافة الكارد')
+    toast.error(tr('حدث خطأ في إضافة الكارد'))
     console.error(error)
   } else {
     setCustomCards([...customCards, data])
-    toast.success('✅ تم إضافة الكارد')
+    toast.success(tr('✅ تم إضافة الكارد'))
     setIsAddCardModalOpen(false)
   }
 
@@ -957,13 +908,14 @@ const handleAddCard = async (title: string, items: string[], color?: string) => 
 }
 
   const handleDeleteCard = async (cardId: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الكارد؟')) return
+    if (!canEdit) return
+    if (!confirm(tr('هل أنت متأكد من حذف هذا الكارد؟'))) return
     const supabase = createClient()
     const { error } = await supabase.from('custom_cards').delete().eq('id', cardId)
-    if (error) toast.error('حدث خطأ في حذف الكارد')
+    if (error) toast.error(tr('حدث خطأ في حذف الكارد'))
     else {
       setCustomCards(customCards.filter(c => c.id !== cardId))
-      toast.success('🗑️ تم حذف الكارد')
+      toast.success(tr('🗑️ تم حذف الكارد'))
     }
   }
 
@@ -971,10 +923,12 @@ const handleAddCard = async (title: string, items: string[], color?: string) => 
     const h = date.getHours()
     const m = String(date.getMinutes()).padStart(2, '0')
     const s = String(date.getSeconds()).padStart(2, '0')
-    const ampm = h >= 12 ? 'مساءً' : 'صباحاً'
+    const ampm = h >= 12 ? tr('مساءً') : tr('صباحاً')
     const hour12 = h % 12 || 12
     return `${hour12}:${m}:${s} ${ampm}`
   }
+
+  const canEdit = schedule?.user_id === user?.id || memberRole === "editor"
 
   if (loading) {
     return (
@@ -991,9 +945,9 @@ const handleAddCard = async (title: string, items: string[], color?: string) => 
   if (!schedule) return null
 
   const totalPhases = phases.length
-  const completedCountFromState = completedCount
+  const completedCountFromState = timerState.scheduleId === id ? Math.max(completedCount, timerState.completedPhases) : completedCount
   const progress = totalPhases > 0 ? Math.round((completedCountFromState / totalPhases) * 100) : 0
-  const formattedDate = format(new Date(schedule.day), 'EEEE، d MMMM yyyy', { locale: ar })
+  const formattedDate = format(new Date(schedule.day), 'EEEE، d MMMM yyyy', { locale: language === 'ar' ? ar : enUS })
   const isToday = schedule.day === today
 
   const isTimerRunning = timerState.isRunning
@@ -1001,7 +955,9 @@ const handleAddCard = async (title: string, items: string[], color?: string) => 
   const isTimerActive = isTimerRunning || isTimerPaused
 
   return (
-    <div className="p-6 space-y-6" dir="rtl">
+    <div className="p-2 sm:p-2 sm:p-6 space-y-6">
+      <SharingPanel scheduleId={schedule.id} owner={schedule.user_id === user?.id} onRole={updateMembers} />
+      {!canEdit && <p role="status">{tr("مشاهدة فقط / View only")}</p>}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -1031,7 +987,7 @@ const handleAddCard = async (title: string, items: string[], color?: string) => 
                 <Calendar className="w-4 h-4" /> {formattedDate}
               </span>
               <span className="text-sm text-[var(--text-secondary)] font-['Cairo'] flex items-center gap-1">
-                <Clock className="w-4 h-4" /> {schedule.start_time}
+                <Clock className="w-4 h-4" /> {formatTime12(schedule.start_time, language)}
               </span>
               {isToday && (
                 <motion.span
@@ -1039,14 +995,13 @@ const handleAddCard = async (title: string, items: string[], color?: string) => 
                   animate={{ scale: 1 }}
                   className="text-xs px-3 py-1 rounded-full bg-[#D4AF37]/20 text-[#D4AF37] font-['Cairo'] animate-pulse"
                 >
-                  ✅ اليوم
-                </motion.span>
+                  {tr(" ✅ اليوم ")}</motion.span>
               )}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {isTimerActive && timerState.scheduleId === id && (
             isTimerPaused ? (
               <motion.button
@@ -1055,8 +1010,7 @@ const handleAddCard = async (title: string, items: string[], color?: string) => 
                 onClick={resumeTimer}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 text-white font-bold shadow-lg hover:shadow-emerald-500/30 transition-all"
               >
-                <Play className="w-4 h-4" /> استئناف
-              </motion.button>
+                <Play className="w-4 h-4" /> {tr(" استئناف ")}</motion.button>
             ) : (
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -1064,13 +1018,12 @@ const handleAddCard = async (title: string, items: string[], color?: string) => 
                 onClick={pauseTimer}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-yellow-500 text-white font-bold shadow-lg hover:shadow-yellow-500/30 transition-all"
               >
-                <Pause className="w-4 h-4" /> إيقاف مؤقت
-              </motion.button>
+                <Pause className="w-4 h-4" /> {tr(" إيقاف مؤقت ")}</motion.button>
             )
           )}
 
           <div className="font-mono text-lg font-bold text-[#D4AF37] bg-[var(--bg-card)] px-4 py-2 rounded-xl border border-[var(--border-color)] shadow-lg">
-            {formatTimeDisplay(currentTime)}
+            {formatTime12(currentTime, language, true)}
           </div>
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -1081,24 +1034,22 @@ const handleAddCard = async (title: string, items: string[], color?: string) => 
             } border border-[var(--border-color)]`}
           >
             {showPrayers ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-            {showPrayers ? 'إخفاء الصلوات' : 'إظهار الصلوات'}
+            {showPrayers ? tr('إخفاء الصلوات') : tr('إظهار الصلوات')}
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => setIsAddCardModalOpen(true)}
+            disabled={!canEdit} onClick={() => setIsAddCardModalOpen(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 transition-colors font-['Cairo'] border border-purple-500/30"
           >
-            <Sparkles className="w-4 h-4" /> كارد
-          </motion.button>
+            <Sparkles className="w-4 h-4" /> {tr(" كارد ")}</motion.button>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => setIsAddSideTaskModalOpen(true)}
+            disabled={!canEdit} onClick={() => setIsAddSideTaskModalOpen(true)}
             className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#D4AF37] text-[#0b1a2e] font-bold hover:shadow-lg hover:shadow-[#D4AF37]/30 transition-all duration-300 font-['Cairo']"
           >
-            <Plus className="w-5 h-5" /> عمل جانبي
-          </motion.button>
+            <Plus className="w-5 h-5" /> {tr(" عمل جانبي ")}</motion.button>
         </div>
       </motion.div>
 
@@ -1109,7 +1060,7 @@ const handleAddCard = async (title: string, items: string[], color?: string) => 
         className="p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-lg"
       >
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-[var(--text-secondary)] font-['Cairo']">تقدم الجلسات</span>
+          <span className="text-sm text-[var(--text-secondary)] font-['Cairo']">{tr("تقدم الجلسات")}</span>
           <span className="text-sm font-bold text-[#D4AF37] font-['Cairo']">
             {progress}% ({completedCountFromState}/{totalPhases})
           </span>
@@ -1134,21 +1085,19 @@ const handleAddCard = async (title: string, items: string[], color?: string) => 
           >
             <div className="flex items-center gap-2 mb-4">
               <Coffee className="w-5 h-5 text-[#D4AF37]" />
-              <h2 className="text-lg font-bold text-[var(--text-primary)] font-['Amiri']">أعمال جانبية</h2>
+              <h2 className="text-lg font-bold text-[var(--text-primary)] font-['Amiri']">{tr("أعمال جانبية")}</h2>
               <span className="mr-auto text-xs text-[var(--text-muted)] font-['Cairo']">
-                {tasks.filter(t => t.type === 'side').length} مهمة
-              </span>
+                {tasks.filter(t => t.type === 'side').length} {tr(" مهمة ")}</span>
             </div>
             {tasks.filter(t => t.type === 'side').length === 0 ? (
               <div className="text-center py-6 text-[var(--text-muted)] font-['Cairo']">
                 <Coffee className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                <p className="text-sm">لا توجد أعمال جانبية</p>
+                <p className="text-sm">{tr("لا توجد أعمال جانبية")}</p>
                 <button
-                  onClick={() => setIsAddSideTaskModalOpen(true)}
+                  disabled={!canEdit} onClick={() => setIsAddSideTaskModalOpen(true)}
                   className="mt-2 text-sm text-[#D4AF37] hover:underline font-['Cairo']"
                 >
-                  أضف عملاً جانبياً
-                </button>
+                  {tr(" أضف عملاً جانبياً ")}</button>
               </div>
             ) : (
               <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
@@ -1177,23 +1126,22 @@ const handleAddCard = async (title: string, items: string[], color?: string) => 
           >
             <div className="flex items-center gap-2 mb-4">
               <Timer className="w-5 h-5 text-[#D4AF37]" />
-              <h2 className="text-lg font-bold text-[var(--text-primary)] font-['Amiri']">جلسات اليوم</h2>
+              <h2 className="text-lg font-bold text-[var(--text-primary)] font-['Amiri']">{tr("جلسات اليوم")}</h2>
               <span className="mr-auto text-xs text-[var(--text-muted)] font-['Cairo']">
-                {totalPhases} مرحلة • {completedCountFromState} مكتملة
-              </span>
+                {totalPhases} {tr(" مرحلة • ")}{completedCountFromState} {tr(" مكتملة ")}</span>
             </div>
 
             {phases.length === 0 ? (
               <div className="text-center py-12 text-[var(--text-muted)] font-['Cairo']">
                 <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                <p>لا توجد جلسات دراسية في هذا الجدول</p>
+                <p>{tr("لا توجد جلسات دراسية في هذا الجدول")}</p>
               </div>
             ) : (
               <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
                 {phases.map((phase, index) => {
                   const isActive = timerState.scheduleId === id && timerState.currentPhaseIndex === index
                   const isCompleted = index < completedCountFromState
-                  const isLocked = !isActive && !isCompleted && (timerState.currentPhaseIndex !== null || (index > 0 && index >= completedCountFromState))
+                  const isLocked = !canEdit || (!isActive && !isCompleted && index > completedCountFromState)
                   const canComplete = isActive && timerState.timeLeft === 0
                   const timeLeft = isActive ? timerState.timeLeft : phase.duration
 
@@ -1221,10 +1169,10 @@ const handleAddCard = async (title: string, items: string[], color?: string) => 
             )}
 
             <div className="mt-4 pt-4 border-t border-[var(--border-color)] flex flex-wrap items-center justify-between text-xs text-[var(--text-muted)] font-['Cairo'] gap-2">
-              <span>⏱️ {schedule.pomodoro.workDuration} د جلسة</span>
-              <span>☕ {schedule.pomodoro.shortBreak} د راحة قصيرة</span>
-              <span>🔄 {schedule.pomodoro.cyclesBeforeLong} دورات</span>
-              <span>🛌 {schedule.pomodoro.longBreak} د راحة طويلة</span>
+              <span>⏱️ {schedule.pomodoro.workDuration} {tr(" د جلسة")}</span>
+              <span>☕ {schedule.pomodoro.shortBreak} {tr(" د راحة قصيرة")}</span>
+              <span>🔄 {schedule.pomodoro.cyclesBeforeLong} {tr(" دورات")}</span>
+              <span>🛌 {schedule.pomodoro.longBreak} {tr(" د راحة طويلة")}</span>
             </div>
           </motion.div>
         </div>
@@ -1239,12 +1187,12 @@ const handleAddCard = async (title: string, items: string[], color?: string) => 
             >
               <div className="flex items-center gap-2 mb-4">
                 <Moon className="w-5 h-5 text-[#D4AF37]" />
-                <h2 className="text-lg font-bold text-[var(--text-primary)] font-['Amiri']">الصلوات</h2>
+                <h2 className="text-lg font-bold text-[var(--text-primary)] font-['Amiri']">{tr("الصلوات")}</h2>
               </div>
               <div className="space-y-2">
                 {prayers.map((prayer) => {
                   const [h, m] = prayer.time.split(':').map(Number)
-                  const ampm = h >= 12 ? 'مساءً' : 'صباحاً'
+                  const ampm = h >= 12 ? tr('مساءً') : tr('صباحاً')
                   const hour12 = h % 12 || 12
                   const timeStr = `${hour12}:${String(m).padStart(2, '0')} ${ampm}`
                   return (
@@ -1266,10 +1214,10 @@ const handleAddCard = async (title: string, items: string[], color?: string) => 
                           {prayer.done && <CheckCircle className="w-3 h-3 text-white" />}
                         </motion.button>
                         <span className={`font-['Cairo'] ${prayer.done ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-primary)]'}`}>
-                          {prayer.name}
+                          {tr(prayer.name)}
                         </span>
                       </div>
-                      <span className="text-sm text-[var(--text-secondary)] font-['Cairo']">{timeStr}</span>
+                      <span className="text-sm text-[var(--text-secondary)] font-['Cairo']">{formatTime12(prayer.time, language)}</span>
                     </div>
                   )
                 })}
@@ -1280,10 +1228,9 @@ const handleAddCard = async (title: string, items: string[], color?: string) => 
           {!showPrayers && (
             <div className="bg-[var(--bg-card)] backdrop-blur-xl rounded-2xl border border-[var(--border-color)] p-5 shadow-lg text-center">
               <Moon className="w-8 h-8 mx-auto mb-2 text-[var(--text-muted)]/20" />
-              <p className="text-sm text-[var(--text-muted)] font-['Cairo']">تم إخفاء الصلوات</p>
+              <p className="text-sm text-[var(--text-muted)] font-['Cairo']">{tr("تم إخفاء الصلوات")}</p>
               <button onClick={() => setShowPrayers(true)} className="mt-2 text-sm text-[#D4AF37] hover:underline font-['Cairo']">
-                إظهارها
-              </button>
+                {tr(" إظهارها ")}</button>
             </div>
           )}
         </div>

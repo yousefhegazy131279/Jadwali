@@ -1,12 +1,15 @@
+'use client'
+import { formatTime12 } from '@/lib/time'
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
 // ============================================================
 //  1. `src/components/Clock.tsx` (نظام 12 ساعة)
 // ============================================================
-'use client'
-
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 
 export function Clock() {
+  const { t: tr, language } = useLanguage()
+
   const [time, setTime] = useState(new Date())
 
   useEffect(() => {
@@ -17,7 +20,7 @@ export function Clock() {
   let hours = time.getHours()
   const minutes = String(time.getMinutes()).padStart(2, '0')
   const seconds = String(time.getSeconds()).padStart(2, '0')
-  const ampm = hours >= 12 ? 'مساءً' : 'صباحاً'
+  const ampm = hours >= 12 ? tr('مساءً') : tr('صباحاً')
   hours = hours % 12 || 12
 
   return (
@@ -26,7 +29,7 @@ export function Clock() {
       animate={{ opacity: 1, y: 0 }}
       className="font-mono text-2xl font-bold text-[#D4AF37] tracking-wider bg-[var(--bg-card)] px-4 py-2 rounded-xl border border-[var(--border-color)] shadow-lg backdrop-blur-sm"
     >
-      {hours}:{minutes}:{seconds} {ampm}
+      {formatTime12(time, language, true)}
     </motion.div>
   )
 }

@@ -1,9 +1,13 @@
 'use client'
-
+import { formatTime12 } from '@/lib/time'
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { useSupabase } from '@/lib/supabaseProvider'
+import ProjectPicker from '@/components/ProjectPicker'
+import AIChat from '@/components/AIChat'
+import { DEFAULT_PRAYER_TIMES, PRAYER_NAMES, normalizePrayerTimes } from '@/lib/preferences'
 import { useRouter } from 'next/navigation'
 import AOS from 'aos'
 import 'aos/dist/aos.css'
@@ -87,25 +91,27 @@ async function createAppNotification(userId: string, title: string, body: string
 }
 
 function TaskInput({ task, onUpdate, onRemove }: any) {
+  const { t: tr, language } = useLanguage()
+
   return (
     <div className="flex flex-col sm:flex-row sm:items-center gap-2">
       <input
         type="text"
-        placeholder="التصنيف"
+        placeholder={tr("التصنيف")}
         value={task.category}
         onChange={(e) => onUpdate(task.id, 'category', e.target.value)}
         className="w-full sm:w-32 px-3 py-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#D4AF37] transition-all duration-300 font-['Cairo'] text-sm"
       />
       <input
         type="text"
-        placeholder="اسم المهمة"
+        data-tour="planner-task" placeholder={tr("اسم المهمة")}
         value={task.name}
         onChange={(e) => onUpdate(task.id, 'name', e.target.value)}
         className="flex-1 px-3 py-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#D4AF37] transition-all duration-300 font-['Cairo'] text-sm"
       />
       <input
         type="number"
-        placeholder="ساعات"
+        placeholder={tr("ساعات")}
         value={task.duration}
         onChange={(e) => onUpdate(task.id, 'duration', parseFloat(e.target.value) || 0)}
         min="0.5"
@@ -115,7 +121,7 @@ function TaskInput({ task, onUpdate, onRemove }: any) {
       <button
         onClick={() => onRemove(task.id)}
         className="p-2 rounded-lg hover:bg-red-500/10 text-red-400 transition-colors self-end sm:self-auto"
-        title="حذف المهمة"
+        title={tr("حذف المهمة")}
       >
         <X className="w-4 h-4" />
       </button>
@@ -124,11 +130,13 @@ function TaskInput({ task, onUpdate, onRemove }: any) {
 }
 
 function SideTaskInput({ task, onUpdate, onRemove }: any) {
+  const { t: tr, language } = useLanguage()
+
   return (
     <div className="flex flex-col sm:flex-row sm:items-center gap-2">
       <input
         type="text"
-        placeholder="اسم العمل الجانبي"
+        placeholder={tr("اسم العمل الجانبي")}
         value={task.name}
         onChange={(e) => onUpdate(task.id, 'name', e.target.value)}
         className="flex-1 px-3 py-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#D4AF37] transition-all duration-300 font-['Cairo'] text-sm"
@@ -136,7 +144,7 @@ function SideTaskInput({ task, onUpdate, onRemove }: any) {
       <button
         onClick={() => onRemove(task.id)}
         className="p-2 rounded-lg hover:bg-red-500/10 text-red-400 transition-colors self-end sm:self-auto"
-        title="حذف العمل الجانبي"
+        title={tr("حذف العمل الجانبي")}
       >
         <X className="w-4 h-4" />
       </button>
@@ -145,6 +153,8 @@ function SideTaskInput({ task, onUpdate, onRemove }: any) {
 }
 
 export default function PlannerPage() {
+  const { t: tr, language } = useLanguage()
+
   const { user } = useSupabase()
   const router = useRouter()
   const [generating, setGenerating] = useState(false)
@@ -156,9 +166,10 @@ export default function PlannerPage() {
   const [date, setDate] = useState(todayStr)
   const [startTime, setStartTime] = useState('08:00')
   const [title, setTitle] = useState('')
+  const [projectId, setProjectId] = useState('')
 
   const [tasks, setTasks] = useState<TaskItem[]>([
-    { id: crypto.randomUUID(), category: 'دراسة', name: '', duration: 2 },
+    { id: crypto.randomUUID(), category: tr('دراسة'), name: '', duration: 2 },
   ])
   const [sideTasks, setSideTasks] = useState<SideTask[]>([
     { id: crypto.randomUUID(), name: '' },
@@ -171,13 +182,24 @@ export default function PlannerPage() {
     cyclesBeforeLong: 4,
   })
 
-  const prayers: Prayer[] = [
-    { name: 'الفجر', time: '04:25' },
-    { name: 'الظهر', time: '13:02' },
-    { name: 'العصر', time: '16:38' },
-    { name: 'المغرب', time: '19:57' },
-    { name: 'العشاء', time: '21:26' },
-  ]
+  const [prayerTimes, setPrayerTimes] = useState(DEFAULT_PRAYER_TIMES)
+  const [preferencesReady, setPreferencesReady] = useState(false)
+  const prayers: Prayer[] = PRAYER_NAMES.map((name, i) => ({ name, time: prayerTimes[i] }))
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    const load = async () => {
+      const { data, error } = await createClient().from('settings').select('prayer_times,pomodoro').eq('user_id', user.id).maybeSingle()
+      if (cancelled) return
+      if (error) { toast.error(tr('تعذر تحميل الإعدادات')); return }
+      setPrayerTimes(normalizePrayerTimes(data?.prayer_times))
+      if (data?.pomodoro) setPomodoro({ ...data.pomodoro, workDuration: data.pomodoro.workDuration ?? data.pomodoro.sessionDuration ?? 50 })
+      setPreferencesReady(true)
+    }
+    void load()
+    window.addEventListener('focus', load)
+    return () => { cancelled = true; window.removeEventListener('focus', load) }
+  }, [user?.id])
 
   useEffect(() => {
     AOS.init({ duration: 600, easing: 'ease-out-cubic', once: true, mirror: true })
@@ -217,12 +239,12 @@ export default function PlannerPage() {
     const now = new Date()
 
     if (selectedDateTime <= now) {
-      toast.error('لا يمكن إنشاء جدول في الماضي. اختر وقتاً مستقبلياً.')
+      toast.error(tr('لا يمكن إنشاء جدول في الماضي. اختر وقتاً مستقبلياً.'))
       return false
     }
 
     if (selectedDate === todayStr && selectedTime <= currentTimeStr) {
-      toast.error('وقت البدء يجب أن يكون بعد الوقت الحالي.')
+      toast.error(tr('وقت البدء يجب أن يكون بعد الوقت الحالي.'))
       return false
     }
 
@@ -230,19 +252,21 @@ export default function PlannerPage() {
   }
 
   const handleGenerate = async () => {
+    if (!user || !preferencesReady || generating) return
     if (!validateDateTime()) return
 
     const validTasks = tasks.some(t => t.category.trim().length > 0 && t.name.trim().length > 0 && t.duration > 0)
     if (!validTasks) {
-      toast.error('أضف مهمة واحدة على الأقل مع تصنيف واسم ومدة صحيحة')
+      toast.error(tr('أضف مهمة واحدة على الأقل مع تصنيف واسم ومدة صحيحة'))
       return
     }
 
     if (!title.trim()) {
-      toast.error('أدخل عنواناً للجدول')
+      toast.error(tr('أدخل عنواناً للجدول'))
       return
     }
 
+    if (!Object.values(pomodoro).every(n => Number.isInteger(n) && n > 0) || pomodoro.workDuration > 120 || pomodoro.shortBreak > 30 || pomodoro.longBreak > 60 || pomodoro.cyclesBeforeLong > 10) { toast.error(tr('تحقق من إعدادات بومودورو')); return }
     setGenerating(true)
 
     try {
@@ -256,6 +280,7 @@ export default function PlannerPage() {
           day: date,
           start_time: startTime,
           pomodoro: pomodoro,
+          project_id: projectId || null,
         })
         .select()
         .single()
@@ -287,7 +312,7 @@ export default function PlannerPage() {
           user_id: user?.id,
           schedule_id: schedule.id,
           name: t.name.trim(),
-          category: 'جانبي',
+          category: tr('جانبي'),
           duration: 0,
           type: 'side',
           priority: 'low',
@@ -313,33 +338,35 @@ export default function PlannerPage() {
       if (prayerError) throw prayerError
 
       if (user?.id) {
-        const notificationTitle = '✅ تم إنشاء الجدول بنجاح'
-        const notificationBody = `جدول "${title.trim()}" بتاريخ ${date} يبدأ الساعة ${startTime}.`
-        await requestNotificationPermission()
+        const notificationTitle = tr('✅ تم إنشاء الجدول بنجاح')
+        const notificationBody = language === "ar" ? `جدول "${title.trim()}" بتاريخ ${date} يبدأ الساعة ${formatTime12(startTime, language)}.` : `Schedule "${title.trim()}" on ${date} starts at ${formatTime12(startTime, language)}.`
+        // Creating a schedule must not wait on an unanswered browser permission prompt.
         sendBrowserNotification(notificationTitle, notificationBody)
         await createAppNotification(user.id, notificationTitle, notificationBody, 'success')
       }
 
-      toast.success('✅ تم إنشاء الجدول بنجاح!')
+      toast.success(tr('✅ تم إنشاء الجدول بنجاح!'))
       router.push('/dashboard/schedule')
     } catch (error: any) {
       console.error(error)
-      toast.error(`حدث خطأ: ${error.message || 'غير معروف'}`)
+      toast.error(`${tr('حدث خطأ', 'An error occurred')}: ${error.message || tr('غير معروف')}`)
     } finally {
       setGenerating(false)
     }
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6" dir="rtl">
+    <div className="p-4 sm:p-6 space-y-6" >
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
         className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-['Amiri'] text-[var(--text-primary)]">📋 المخطط الذكي</h1>
-          <p className="text-[var(--text-secondary)] text-sm font-['Cairo'] mt-1">أنشئ جدولاً يومياً متكاملاً مع مهامك وصلواتك</p>
+          <h1 className="text-3xl font-bold font-['Amiri'] text-[var(--text-primary)]">{tr("📋 المخطط الذكي")}</h1>
+          <p className="text-[var(--text-secondary)] text-sm font-['Cairo'] mt-1">{tr("أنشئ جدولاً يومياً متكاملاً مع مهامك وصلواتك")}</p>
         </div>
       </motion.div>
 
+      <AIChat date={date} onApply={draft => { setTitle(draft.title); setDate(draft.date); setStartTime(draft.start_time); setTasks(draft.tasks.map(task => ({id:crypto.randomUUID(),name:task.name,category:task.category,duration:task.duration_minutes/60}))) }} />
+      <ProjectPicker value={projectId} onChange={setProjectId} />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           {/* معلومات الجدول */}
@@ -347,22 +374,22 @@ export default function PlannerPage() {
             className="bg-[var(--bg-card)] backdrop-blur-xl rounded-2xl border border-[var(--border-color)] p-5 sm:p-6 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center gap-2 mb-4">
               <Calendar className="w-5 h-5 text-[#D4AF37]" />
-              <h2 className="text-lg font-bold text-[var(--text-primary)] font-['Amiri']">معلومات الجدول</h2>
+              <h2 className="text-lg font-bold text-[var(--text-primary)] font-['Amiri']">{tr("معلومات الجدول")}</h2>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-1">عنوان الجدول *</label>
-                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="مثال: يوم عمل مكثف"
+                <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-1">{tr("عنوان الجدول *")}</label>
+                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} data-tour="planner-title" placeholder={tr("مثال: يوم عمل مكثف")}
                   className="w-full px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#D4AF37] transition-all duration-300 font-['Cairo']" />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-1">التاريخ</label>
+                  <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-1">{tr("التاريخ")}</label>
                   <input type="date" value={date} min={todayStr} onChange={(e) => setDate(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:border-[#D4AF37] transition-all duration-300 font-['Cairo']" />
                 </div>
                 <div>
-                  <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-1">وقت البدء</label>
+                  <label className="block text-sm text-[var(--text-secondary)] font-['Cairo'] mb-1">{tr("وقت البدء")}</label>
                   <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} min={date === todayStr ? currentTimeStr : undefined}
                     className="w-full px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:border-[#D4AF37] transition-all duration-300 font-['Cairo']" />
                 </div>
@@ -376,13 +403,12 @@ export default function PlannerPage() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Tag className="w-5 h-5 text-[#D4AF37]" />
-                <h2 className="text-lg font-bold text-[var(--text-primary)] font-['Amiri']">المهام الأساسية</h2>
-                <span className="text-xs text-[var(--text-muted)] bg-white/5 px-2 py-1 rounded-full">{tasks.length} مهام</span>
+                <h2 className="text-lg font-bold text-[var(--text-primary)] font-['Amiri']">{tr("المهام الأساسية")}</h2>
+                <span className="text-xs text-[var(--text-muted)] bg-white/5 px-2 py-1 rounded-full">{tasks.length} {tr(" مهام")}</span>
               </div>
               <button onClick={addTask}
                 className="flex items-center gap-1 px-3 py-2 rounded-xl bg-[#D4AF37]/10 text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-colors font-['Cairo'] text-sm">
-                <Plus className="w-4 h-4" /> إضافة مهمة
-              </button>
+                <Plus className="w-4 h-4" /> {tr(" إضافة مهمة ")}</button>
             </div>
             <div className="space-y-3">
               {tasks.map((task) => (
@@ -397,13 +423,12 @@ export default function PlannerPage() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Coffee className="w-5 h-5 text-[#D4AF37]" />
-                <h2 className="text-lg font-bold text-[var(--text-primary)] font-['Amiri']">الأعمال الجانبية</h2>
-                <span className="text-xs text-[var(--text-muted)] bg-white/5 px-2 py-1 rounded-full">{sideTasks.length} أعمال</span>
+                <h2 className="text-lg font-bold text-[var(--text-primary)] font-['Amiri']">{tr("الأعمال الجانبية")}</h2>
+                <span className="text-xs text-[var(--text-muted)] bg-white/5 px-2 py-1 rounded-full">{sideTasks.length} {tr(" أعمال")}</span>
               </div>
               <button onClick={addSideTask}
                 className="flex items-center gap-1 px-3 py-2 rounded-xl bg-[#D4AF37]/10 text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-colors font-['Cairo'] text-sm">
-                <Plus className="w-4 h-4" /> إضافة عمل
-              </button>
+                <Plus className="w-4 h-4" /> {tr(" إضافة عمل ")}</button>
             </div>
             <div className="space-y-3">
               {sideTasks.map((task) => (
@@ -419,17 +444,17 @@ export default function PlannerPage() {
             className="bg-[var(--bg-card)] backdrop-blur-xl rounded-2xl border border-[var(--border-color)] p-5 sm:p-6 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center gap-2 mb-4">
               <Timer className="w-5 h-5 text-[#D4AF37]" />
-              <h2 className="text-lg font-bold text-[var(--text-primary)] font-['Amiri']">إعدادات بومودورو</h2>
+              <h2 className="text-lg font-bold text-[var(--text-primary)] font-['Amiri']">{tr("إعدادات بومودورو")}</h2>
             </div>
             <div className="space-y-3">
               {[
-                { label: 'مدة العمل (دقيقة)', key: 'workDuration', value: pomodoro.workDuration, min: 1, max: 60 },
-                { label: 'راحة قصيرة (دقيقة)', key: 'shortBreak', value: pomodoro.shortBreak, min: 1, max: 30 },
-                { label: 'راحة طويلة (دقيقة)', key: 'longBreak', value: pomodoro.longBreak, min: 1, max: 60 },
-                { label: 'دورات قبل راحة طويلة', key: 'cyclesBeforeLong', value: pomodoro.cyclesBeforeLong, min: 2, max: 10 },
+                { label: tr('مدة العمل (دقيقة)'), key: 'workDuration', value: pomodoro.workDuration, min: 1, max: 60 },
+                { label: tr('راحة قصيرة (دقيقة)'), key: 'shortBreak', value: pomodoro.shortBreak, min: 1, max: 30 },
+                { label: tr('راحة طويلة (دقيقة)'), key: 'longBreak', value: pomodoro.longBreak, min: 1, max: 60 },
+                { label: tr('دورات قبل راحة طويلة'), key: 'cyclesBeforeLong', value: pomodoro.cyclesBeforeLong, min: 2, max: 10 },
               ].map((item) => (
                 <div key={item.key}>
-                  <label className="block text-xs text-[var(--text-secondary)] font-['Cairo'] mb-1">{item.label}</label>
+                  <label className="block text-xs text-[var(--text-secondary)] font-['Cairo'] mb-1">{tr(item.label)}</label>
                   <input type="number" min={item.min} max={item.max} value={item.value}
                     onChange={(e) => updatePomodoro(item.key as keyof PomodoroSettings, parseInt(e.target.value) || 0)}
                     className="w-full px-3 py-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:border-[#D4AF37] transition-all duration-300 font-['Cairo'] text-sm" />
@@ -443,13 +468,13 @@ export default function PlannerPage() {
             className="bg-[var(--bg-card)] backdrop-blur-xl rounded-2xl border border-[var(--border-color)] p-5 sm:p-6 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center gap-2 mb-4">
               <Moon className="w-5 h-5 text-[#D4AF37]" />
-              <h2 className="text-lg font-bold text-[var(--text-primary)] font-['Amiri']">مواقيت الصلاة</h2>
+              <h2 className="text-lg font-bold text-[var(--text-primary)] font-['Amiri']">{tr("مواقيت الصلاة")}</h2>
             </div>
             <div className="space-y-2">
               {prayers.map((p, i) => (
                 <div key={i} className="flex items-center justify-between p-2.5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-[#D4AF37]/30 transition-colors">
-                  <span className="text-sm text-[var(--text-primary)] font-['Cairo']">{p.name}</span>
-                  <span className="text-sm text-[var(--text-secondary)] font-['Cairo']">{p.time}</span>
+                  <span className="text-sm text-[var(--text-primary)] font-['Cairo']">{tr(p.name)}</span>
+                  <span className="text-sm text-[var(--text-secondary)] font-['Cairo']">{formatTime12(p.time, language)}</span>
                 </div>
               ))}
             </div>
@@ -457,9 +482,9 @@ export default function PlannerPage() {
 
           {/* زر الإنشاء */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
-            <button onClick={handleGenerate} disabled={generating}
+            <button data-tour="planner-create" onClick={handleGenerate} disabled={generating || !preferencesReady}
               className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#D4AF37] to-[#E8C84A] text-[#0b1a2e] font-bold hover:shadow-lg hover:shadow-[#D4AF37]/30 transition-all duration-300 font-['Cairo'] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-lg">
-              {generating ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Zap className="w-6 h-6" /> إنشاء الجدول</>}
+              {generating ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Zap className="w-6 h-6" /> {tr(" إنشاء الجدول")}</>}
             </button>
           </motion.div>
         </div>

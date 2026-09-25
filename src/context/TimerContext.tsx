@@ -1,340 +1,171 @@
 'use client'
-
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
 import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { useSupabase } from '@/lib/supabaseProvider'
+import { completedPhaseCount, remainingSeconds, taskSessionNumber } from '@/lib/progress'
 
 type Phase = {
   type: 'work' | 'shortBreak' | 'longBreak'
-  duration: number // بالثواني
+  duration: number
   taskId?: string
   taskName?: string
   sessionNumber?: number
   startTime: Date
   endTime: Date
 }
-
 type TimerState = {
-  isRunning: boolean
-  isPaused: boolean
-  timeLeft: number
-  currentPhaseIndex: number | null
-  phases: Phase[]
-  scheduleId: string | null
-  scheduleTitle: string | null
-  taskName: string | null
-  sessionNumber: number | null
-  totalPhases: number
-  completedPhases: number
-  isVisible: boolean
-  endTime: string | null
+  isRunning: boolean; isPaused: boolean; timeLeft: number; currentPhaseIndex: number | null
+  phases: Phase[]; scheduleId: string | null; scheduleTitle: string | null
+  taskName: string | null; sessionNumber: number | null; totalPhases: number
+  completedPhases: number; isVisible: boolean; endTime: string | null
 }
-
 const defaultState: TimerState = {
-  isRunning: false,
-  isPaused: false,
-  timeLeft: 0,
-  currentPhaseIndex: null,
-  phases: [],
-  scheduleId: null,
-  scheduleTitle: null,
-  taskName: null,
-  sessionNumber: null,
-  totalPhases: 0,
-  completedPhases: 0,
-  isVisible: false,
-  endTime: null,
+  isRunning: false, isPaused: false, timeLeft: 0, currentPhaseIndex: null, phases: [],
+  scheduleId: null, scheduleTitle: null, taskName: null, sessionNumber: null,
+  totalPhases: 0, completedPhases: 0, isVisible: false, endTime: null,
 }
-
-const STORAGE_KEY = 'jadwali_timer_state'
-
-function playAlertSound() {
-  try {
-    const AudioContext = window.AudioContext || (window as any).webkitAudioContext
-    if (!AudioContext) return
-    const ctx = new AudioContext()
-    const playTone = (freq: number, start: number, duration: number, volume = 0.3) => {
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.type = 'sine'
-      osc.frequency.value = freq
-      gain.gain.setValueAtTime(0.001, ctx.currentTime + start)
-      gain.gain.exponentialRampToValueAtTime(volume, ctx.currentTime + start + 0.02)
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration)
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.start(ctx.currentTime + start)
-      osc.stop(ctx.currentTime + start + duration)
-    }
-    playTone(880, 0, 0.3)
-    playTone(1100, 0.3, 0.4)
-    setTimeout(() => playTone(1320, 0, 0.5, 0.35), 800)
-  } catch (e) {
-    console.error('فشل تشغيل الصوت:', e)
-  }
-}
-
-function loadInitialState(): TimerState {
-  if (typeof window === 'undefined') return defaultState
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
-      const parsed = JSON.parse(saved)
-      if (parsed.phases && Array.isArray(parsed.phases)) {
-        parsed.phases = parsed.phases.map((p: any) => ({
-          ...p,
-          startTime: new Date(p.startTime),
-          endTime: new Date(p.endTime),
-        }))
-      }
-      return { ...defaultState, ...parsed }
-    }
-  } catch (_) {}
-  return defaultState
-}
-
 type TimerContextType = {
   timerState: TimerState
-  startTimer: (scheduleId: string, scheduleTitle: string, phases: Phase[], startIndex: number) => void
-  pauseTimer: () => void
-  resumeTimer: () => void
-  completePhase: () => void
-  resetTimer: () => void
-  setTimerVisibility: (visible: boolean) => void
+  startTimer: (scheduleId: string, title: string, phases: Phase[], index: number) => void
+  pauseTimer: () => void; resumeTimer: () => void; completePhase: () => void
+  resetTimer: () => void; setTimerVisibility: (visible: boolean) => void
 }
-
 const TimerContext = createContext<TimerContextType | undefined>(undefined)
 
 export function TimerProvider({ children }: { children: ReactNode }) {
-  const [timerState, setTimerState] = useState<TimerState>(loadInitialState)
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  const phaseCompletedRef = useRef(false) // ✅ منع التكرار عند الوصول إلى 0
+  const { t: tr, language } = useLanguage()
 
-  // حفظ الحالة في localStorage عند أي تغيير
+  const { user } = useSupabase()
+  const [timerState, setTimerState] = useState<TimerState>(defaultState)
+  const stateRef = useRef(defaultState)
+  const busy = useRef(false)
+  const account = useRef<string | null>(null)
+  const publish = useCallback((state: TimerState) => {
+    stateRef.current = state
+    setTimerState(state)
+    try { if (account.current) localStorage.setItem('jadwali_timer_v2:' + account.current, JSON.stringify(state)) } catch { /* Timer remains usable if browser storage is full. */ }
+  }, [])
+  const resetTimer = useCallback(() => publish({ ...defaultState }), [publish])
+
   useEffect(() => {
+    account.current = user?.id ?? null
+    let restored = { ...defaultState }
     try {
-      const toSave = {
-        ...timerState,
-        phases: timerState.phases.map(p => ({
-          ...p,
-          startTime: p.startTime instanceof Date ? p.startTime.toISOString() : p.startTime,
-          endTime: p.endTime instanceof Date ? p.endTime.toISOString() : p.endTime,
-        })),
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave))
-    } catch (_) {}
-  }, [timerState])
-
-  // ✅ دالة إكمال المرحلة الحالية، تستخدم عند انتهاء الوقت أو الضغط على إنهاء
-  const handlePhaseComplete = useCallback(() => {
-    setTimerState(prev => {
-      if (prev.currentPhaseIndex === null) return prev
-
-      const currentIndex = prev.currentPhaseIndex
-      const currentPhase = prev.phases[currentIndex]
-      const nextIndex = currentIndex + 1
-      const completed = prev.completedPhases + 1
-
-      // تشغيل الصوت وإرسال الإشعار
-      playAlertSound()
-      if (currentPhase?.type === 'work') {
-        toast.success('✅ اكتملت جلسة عمل!')
-      } else if (currentPhase?.type === 'shortBreak') {
-        toast.info('☕ انتهت الراحة القصيرة')
-      } else if (currentPhase?.type === 'longBreak') {
-        toast.info('🛌 انتهت الراحة الطويلة')
-      }
-
-      if (nextIndex < prev.phases.length) {
-        const nextPhase = prev.phases[nextIndex]
-        const now = Date.now()
-        const endTime = new Date(now + nextPhase.duration * 1000).toISOString()
-        return {
-          ...prev,
-          currentPhaseIndex: nextIndex,
-          timeLeft: nextPhase.duration,
-          endTime,
-          completedPhases: completed,
-          taskName: nextPhase.taskName || null,
-          sessionNumber: nextPhase.sessionNumber || null,
-        }
-      } else {
-        toast.success('🎉 اكتملت جميع الجلسات!')
-        return {
-          ...prev,
-          isRunning: false,
-          isPaused: false,
-          currentPhaseIndex: null,
-          timeLeft: 0,
-          endTime: null,
-          completedPhases: prev.phases.length,
-          taskName: null,
-          sessionNumber: null,
+      const saved = account.current && localStorage.getItem('jadwali_timer_v2:' + account.current)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed.phases) && parsed.phases.every((p: Phase) => Number.isFinite(p.duration) && p.duration > 0)) {
+          restored = { ...defaultState, ...parsed, phases: parsed.phases.map((p: Phase) => ({ ...p, startTime: new Date(p.startTime), endTime: new Date(p.endTime) })) }
+          if (restored.isRunning) restored.timeLeft = remainingSeconds(restored.endTime, restored.timeLeft)
         }
       }
-    })
-  }, [])
+    } catch { /* A corrupt local cache must not prevent login. */ }
+    publish(restored)
+  }, [user?.id, publish])
 
-  // ✅ مراقبة وصول timeLeft إلى 0 لاستدعاء handlePhaseComplete مرة واحدة
-  useEffect(() => {
-    if (timerState.isRunning && !timerState.isPaused && timerState.timeLeft === 0) {
-      if (!phaseCompletedRef.current) {
-        phaseCompletedRef.current = true
-        handlePhaseComplete()
-      }
-    } else {
-      phaseCompletedRef.current = false
-    }
-  }, [timerState.timeLeft, timerState.isRunning, timerState.isPaused, handlePhaseComplete])
-
-  // ✅ بدء الفاصل الزمني للعد التنازلي
-  const startInterval = useCallback(() => {
-    if (intervalRef.current) clearInterval(intervalRef.current)
-    intervalRef.current = setInterval(() => {
-      setTimerState(prev => {
-        if (!prev.isRunning || prev.isPaused) return prev
-        if (prev.timeLeft > 0) {
-          return { ...prev, timeLeft: prev.timeLeft - 1 }
-        }
-        return prev // يترك الباقي للمراقب useEffect
-      })
-    }, 1000)
-  }, [])
-
-  useEffect(() => {
-    if (timerState.isRunning && !timerState.isPaused) {
-      startInterval()
-    } else if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
-  }, [timerState.isRunning, timerState.isPaused, startInterval])
-
-  // عند التحميل، إذا كان المؤقت يعمل، احسب الوقت المتبقي
-  useEffect(() => {
-    const state = loadInitialState()
-    if (state.isRunning && !state.isPaused && state.endTime) {
-      const now = Date.now()
-      const end = new Date(state.endTime).getTime()
-      const diff = Math.max(0, Math.floor((end - now) / 1000))
-      setTimerState(prev => ({ ...prev, timeLeft: diff }))
-    }
-  }, [])
-
-  const startTimer = useCallback((scheduleId: string, scheduleTitle: string, phases: Phase[], startIndex: number) => {
-    const phase = phases[startIndex]
+  const completePhase = useCallback(async () => {
+    const previous = stateRef.current
+    if (busy.current || previous.currentPhaseIndex === null || previous.timeLeft > 0) return
+    const index = previous.currentPhaseIndex
+    const phase = previous.phases[index]
     if (!phase) return
-    const now = Date.now()
-    const endTime = new Date(now + phase.duration * 1000).toISOString()
-    const newState: TimerState = {
-      isRunning: true,
-      isPaused: false,
-      timeLeft: phase.duration,
-      currentPhaseIndex: startIndex,
-      phases: phases.map(p => ({
-        ...p,
-        startTime: new Date(p.startTime),
-        endTime: new Date(p.endTime),
-      })),
-      scheduleId,
-      scheduleTitle,
-      taskName: phase.taskName || null,
-      sessionNumber: phase.sessionNumber || null,
-      totalPhases: phases.length,
-      completedPhases: 0,
-      isVisible: true,
-      endTime,
-    }
-    setTimerState(newState)
+    busy.current = true
+    const userId = account.current
     try {
-      const toSave = {
-        ...newState,
-        phases: newState.phases.map(p => ({
-          ...p,
-          startTime: p.startTime.toISOString(),
-          endTime: p.endTime.toISOString(),
-        })),
+      if (phase.type === 'work' && phase.taskId) {
+        const { error } = await createClient().rpc('record_work_session', {
+          p_task_id: phase.taskId, p_session_number: taskSessionNumber(previous.phases, index),
+        })
+        if (error) throw error
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave))
-    } catch (_) {}
-  }, [])
-
-  const pauseTimer = useCallback(() => {
-    setTimerState(prev => {
-      if (!prev.isRunning) return prev
-      return { ...prev, isPaused: true, isRunning: false }
-    })
-  }, [])
-
-  const resumeTimer = useCallback(() => {
-    setTimerState(prev => {
-      if (!prev.isPaused) return prev
-      const now = Date.now()
-      const endTime = new Date(now + prev.timeLeft * 1000).toISOString()
-      return { ...prev, isRunning: true, isPaused: false, endTime }
-    })
-  }, [])
-
-  const completePhase = useCallback(() => {
-    handlePhaseComplete()
-  }, [handlePhaseComplete])
-
-  const resetTimer = useCallback(() => {
-    setTimerState(defaultState)
-    try {
-      localStorage.removeItem(STORAGE_KEY)
-    } catch (_) {}
-  }, [])
-
-  const setTimerVisibility = useCallback((visible: boolean) => {
-    setTimerState(prev => ({ ...prev, isVisible: visible }))
-  }, [])
+      if (account.current !== userId || stateRef.current.scheduleId !== previous.scheduleId || stateRef.current.currentPhaseIndex !== index) return
+      const next = previous.phases[index + 1]
+      publish(next ? {
+        ...stateRef.current, currentPhaseIndex: index + 1, completedPhases: index + 1,
+        taskName: next.taskName ?? null, sessionNumber: next.sessionNumber ?? null,
+        timeLeft: next.duration,
+        endTime: stateRef.current.isRunning ? new Date(Date.now() + next.duration * 1000).toISOString() : null,
+      } : { ...previous, isRunning: false, isPaused: false, currentPhaseIndex: null,
+        timeLeft: 0, endTime: null, completedPhases: previous.phases.length, taskName: null, sessionNumber: null })
+      window.dispatchEvent(new Event('jadwali-progress'))
+      toast.success(next ? tr('✅ اكتملت الجلسة') : tr('🎉 اكتملت جميع الجلسات!'))
+    } catch {
+      if (account.current === userId && stateRef.current.scheduleId === previous.scheduleId) {
+        publish({ ...stateRef.current, isRunning: false, isPaused: true, endTime: null })
+        toast.error(tr('تعذر حفظ الجلسة. تحقق من الاتصال ثم اضغط استئناف لإعادة المحاولة.'))
+      }
+    } finally { busy.current = false }
+  }, [publish])
 
   useEffect(() => {
-    const supabase = createClient()
-    const channel = supabase
-      .channel('timer-schedule-deletion')
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'schedules' },
-        (payload) => {
-          const deletedId = payload.old?.id
-          if (deletedId && timerState.scheduleId === deletedId) {
-            resetTimer()
-            toast.info('🗑️ تم حذف الجدول المرتبط بالمؤقت، تم إيقاف المؤقت.')
-          }
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
+    if (!timerState.isRunning) return
+    const tick = () => {
+      const state = stateRef.current
+      if (!state.isRunning) return
+      const timeLeft = remainingSeconds(state.endTime, state.timeLeft)
+      if (timeLeft !== state.timeLeft) publish({ ...state, timeLeft })
+      if (timeLeft === 0) void completePhase()
     }
-  }, [timerState.scheduleId, resetTimer])
+    tick()
+    const interval = setInterval(tick, 250)
+    return () => clearInterval(interval)
+  }, [timerState.isRunning, completePhase, publish])
 
-  return (
-    <TimerContext.Provider
-      value={{
-        timerState,
-        startTimer,
-        pauseTimer,
-        resumeTimer,
-        completePhase,
-        resetTimer,
-        setTimerVisibility,
-      }}
-    >
-      {children}
-    </TimerContext.Provider>
-  )
+  useEffect(() => {
+    if (!user) return
+    const supabase = createClient()
+    const reconcile = async () => {
+      const before = stateRef.current
+      if (!before.scheduleId || busy.current) return
+      const { data: schedule, error: accessError } = await supabase.from('schedules').select('id').eq('id', before.scheduleId).maybeSingle()
+      if (accessError) return
+      if (stateRef.current.scheduleId !== before.scheduleId) return
+      if (!schedule) { resetTimer(); return }
+      const { data, error } = await supabase.from('tasks').select('id,completed_sessions').eq('schedule_id', before.scheduleId)
+      if (error || !data || stateRef.current.scheduleId !== before.scheduleId || busy.current) return
+      const state = stateRef.current
+      const prefix = completedPhaseCount(state.phases, data)
+      if (prefix <= state.completedPhases) return
+      const next = state.phases[prefix]
+      publish({ ...state, completedPhases: prefix, currentPhaseIndex: next ? prefix : null,
+        isRunning: false, isPaused: !!next, timeLeft: next?.duration ?? 0, endTime: null,
+        taskName: next?.taskName ?? null, sessionNumber: next?.sessionNumber ?? null })
+    }
+    void reconcile()
+    window.addEventListener('focus', reconcile)
+    const channel = supabase.channel('timer-progress-' + user.id).on('postgres_changes',
+      { event: '*', schema: 'public', table: 'tasks' }, reconcile).subscribe()
+    return () => { window.removeEventListener('focus', reconcile); void supabase.removeChannel(channel) }
+  }, [user?.id, resetTimer, publish])
+
+  const startTimer = useCallback((scheduleId: string, scheduleTitle: string, phases: Phase[], index: number) => {
+    const phase = phases[index]
+    if (!phase || !account.current || busy.current) return
+    if ((stateRef.current.isRunning || stateRef.current.isPaused) && stateRef.current.scheduleId !== scheduleId) {
+      toast.error(tr('أوقف مؤقت الجدول الحالي أولاً')); return
+    }
+    publish({ ...defaultState, scheduleId, scheduleTitle, phases,
+      isRunning: true, isVisible: true, timeLeft: phase.duration, currentPhaseIndex: index,
+      completedPhases: index, totalPhases: phases.length, taskName: phase.taskName ?? null,
+      sessionNumber: phase.sessionNumber ?? null, endTime: new Date(Date.now() + phase.duration * 1000).toISOString() })
+  }, [publish])
+  const pauseTimer = useCallback(() => {
+    const state = stateRef.current
+    if (state.isRunning) publish({ ...state, isRunning: false, isPaused: true,
+      timeLeft: remainingSeconds(state.endTime, state.timeLeft), endTime: null })
+  }, [publish])
+  const resumeTimer = useCallback(() => {
+    const state = stateRef.current
+    if (state.isPaused) publish({ ...state, isRunning: true, isPaused: false,
+      endTime: new Date(Date.now() + state.timeLeft * 1000).toISOString() })
+  }, [publish])
+  const setTimerVisibility = useCallback((visible: boolean) => publish({ ...stateRef.current, isVisible: visible }), [publish])
+  return <TimerContext.Provider value={{ timerState, startTimer, pauseTimer, resumeTimer, completePhase, resetTimer, setTimerVisibility }}>{children}</TimerContext.Provider>
 }
-
 export function useTimer() {
   const context = useContext(TimerContext)
-  if (context === undefined) {
-    throw new Error('useTimer must be used within a TimerProvider')
-  }
+  if (!context) throw new Error('useTimer must be used within a TimerProvider')
   return context
 }

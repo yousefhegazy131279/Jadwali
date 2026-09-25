@@ -1,5 +1,5 @@
 'use client'
-
+import { useLanguage, translate as tr, LanguageToggle } from '@/context/LanguageContext'
 import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { useTour } from '@/context/TourContext'
@@ -20,6 +20,8 @@ function getElementPosition(selector: string) {
 }
 
 export default function TourOverlay() {
+  const { t: tr, language } = useLanguage()
+
   const { isOpen, currentStep, nextStep, prevStep, skipTour, isActionDone } = useTour()
   const [position, setPosition] = useState<{ top: number; left: number; width: number; height: number } | null>(null)
   const [fallback, setFallback] = useState(false)
@@ -71,7 +73,7 @@ export default function TourOverlay() {
   if (!isOpen || !step) return null
 
   const isLast = currentStep === tourSteps.length - 1
-  const isNextDisabled = step.required && !isActionDone
+  const isNextDisabled = step.required && !isActionDone && !fallback
 
   let cardStyle: React.CSSProperties = {}
   if (fallback || placement === 'center') {
@@ -120,17 +122,16 @@ export default function TourOverlay() {
         style={cardStyle}
       >
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-bold text-xl">{step.title}</h3>
+          <h3 className="font-bold text-xl">{tr(step.title)}</h3>
           <button onClick={skipTour} className="p-1 rounded-lg hover:bg-gray-100">
             <X className="w-6 h-6" />
           </button>
         </div>
-        <p className="text-base leading-relaxed">{step.description}</p>
+        <p className="text-base leading-relaxed">{tr(step.description)}</p>
 
         {isNextDisabled && (
           <p className="mt-3 text-sm text-amber-600 bg-amber-50 p-2 rounded-lg flex items-center gap-1">
-            <Lock className="w-4 h-4" /> قم بتنفيذ الإجراء المطلوب أولًا
-          </p>
+            <Lock className="w-4 h-4" /> {tr(" قم بتنفيذ الإجراء المطلوب أولًا ")}</p>
         )}
 
         <div className="flex items-center justify-between mt-5">
@@ -138,8 +139,7 @@ export default function TourOverlay() {
           <div className="flex gap-2">
             {currentStep > 0 && (
               <button onClick={prevStep} className="px-4 py-2 rounded-xl bg-gray-200">
-                السابق
-              </button>
+                {tr(" السابق ")}</button>
             )}
             <button
               onClick={nextStep}
@@ -150,7 +150,7 @@ export default function TourOverlay() {
                   : 'bg-[#D4AF37] text-gray-900 hover:shadow-lg'
               }`}
             >
-              {isNextDisabled ? <Lock className="w-4 h-4" /> : isLast ? 'إنهاء' : 'التالي'}
+              {isNextDisabled ? <Lock className="w-4 h-4" /> : isLast ? tr('إنهاء') : tr('التالي')}
             </button>
           </div>
         </div>
