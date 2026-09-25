@@ -32,12 +32,13 @@ export default function TourOverlay() {
 
   const updatePosition = useCallback(() => {
     if (!isOpen || !step) return
-    const pos = getElementPosition(step.selector)
-    if (pos) {
+    const target = document.querySelector(step.selector)
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
+      const pos = getElementPosition(step.selector)
+      if (!pos) return
       setPosition(pos)
       setFallback(false)
-      const el = document.querySelector(step.selector)
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
 
       const elementCenter = pos.top + pos.height / 2
       const windowCenter = window.innerHeight / 2
@@ -54,9 +55,16 @@ export default function TourOverlay() {
     updatePosition()
     window.addEventListener('resize', updatePosition)
     const timer = setTimeout(updatePosition, 500)
+    const retry = window.setInterval(() => {
+      if (document.querySelector(step.selector)) {
+        updatePosition()
+        clearInterval(retry)
+      }
+    }, 250)
     return () => {
       window.removeEventListener('resize', updatePosition)
       clearTimeout(timer)
+      clearInterval(retry)
     }
   }, [updatePosition, isOpen, step])
 
@@ -118,7 +126,10 @@ export default function TourOverlay() {
       <motion.div
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="absolute z-10 pointer-events-auto bg-white text-gray-900 border border-gray-300 rounded-2xl p-6 shadow-2xl max-w-md w-[90%] md:w-96"
+        role="dialog"
+        aria-modal="false"
+        aria-label={tr(step.title)}
+        className="absolute z-10 pointer-events-auto bg-white text-gray-900 border border-gray-300 rounded-2xl p-4 sm:p-6 shadow-2xl max-w-md w-[90%] md:w-96 max-md:!left-3 max-md:!right-3 max-md:!top-auto max-md:!bottom-4 max-md:!w-auto max-md:!max-w-none max-md:!translate-x-0 max-md:!translate-y-0"
         style={cardStyle}
       >
         <div className="flex items-center justify-between mb-3">
