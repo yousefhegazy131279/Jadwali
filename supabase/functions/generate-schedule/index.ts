@@ -152,6 +152,8 @@ Deno.serve(async (request: Request) => {
       return reply({ error: 'Invalid conversation' }, 400)
     }
 
+
+
     const systemMessage = `
 You are Jadwool, a daily planning assistant.
 
