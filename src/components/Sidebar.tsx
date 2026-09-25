@@ -6,6 +6,7 @@ import { useSupabase } from '@/lib/supabaseProvider'
 import { useTheme } from '@/context/ThemeContext'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Logo } from '@/components/Logo'
+import { LanguageToggle } from '@/context/LanguageContext'
 import { useState, useEffect, memo } from 'react'
 import {
   LayoutDashboard,
@@ -22,6 +23,9 @@ import {
   Menu,
   X,
   Shield,
+  BarChart3,
+  Users,
+  FolderKanban,
 } from 'lucide-react'
 
 const navItems = [
@@ -29,9 +33,9 @@ const navItems = [
   { href: '/dashboard/planner', icon: Calendar, label: 'المخطط' },
   { href: '/dashboard/schedule', icon: Clock, label: 'الجدول' },
   { href: '/dashboard/workspace', icon: FolderOpen, label: 'المهام' },
-  { href: '/dashboard/projects', icon: FolderOpen, label: 'المشاريع' },
-  { href: '/dashboard/shared', icon: User, label: 'المشترك' },
-  { href: '/dashboard/analytics', icon: LayoutDashboard, label: 'الإحصائيات' },
+  { href: '/dashboard/projects', icon: FolderKanban, label: 'المشاريع' },
+  { href: '/dashboard/shared', icon: Users, label: 'المشترك' },
+  { href: '/dashboard/analytics', icon: BarChart3, label: 'الإحصائيات' },
   { href: '/dashboard/settings', icon: Settings, label: 'الإعدادات' },
 ]
 
@@ -176,6 +180,7 @@ export const Sidebar = memo(function Sidebar() {
         </nav>
 
         <div className="border-t border-[var(--border-color)] pt-4 space-y-2">
+          <LanguageToggle />
           <button
             type="button"
             onClick={toggleTheme}
