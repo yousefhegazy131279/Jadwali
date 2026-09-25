@@ -6,7 +6,7 @@ import { useSupabase } from '@/lib/supabaseProvider'
 import { useTheme } from '@/context/ThemeContext'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Logo } from '@/components/Logo'
-import { LanguageToggle } from '@/context/LanguageContext'
+import { LanguageToggle, useLanguage } from '@/context/LanguageContext'
 import { useState, useEffect, memo } from 'react'
 import {
   LayoutDashboard,
@@ -44,6 +44,7 @@ export const Sidebar = memo(function Sidebar() {
   const pathname = usePathname()
   const { supabase, user, isAdmin } = useSupabase()
   const { theme, toggleTheme } = useTheme()
+  const { language, t } = useLanguage()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -108,14 +109,15 @@ export const Sidebar = memo(function Sidebar() {
       {/* الشريط الجانبي - يستخدم inline style لضمان الموضع */}
       <aside
         className={`
-          fixed top-0 right-0 h-screen 
+          fixed top-0 h-screen
+          ${language === 'ar' ? 'right-0 border-l' : 'left-0 border-r'}
           bg-[var(--bg-card)] backdrop-blur-xl 
-          border-l border-[var(--border-color)] 
+          border-[var(--border-color)]
           p-4 flex flex-col z-[1060] 
           transition-all duration-300 shadow-lg
           ${isCollapsed ? 'md:w-20' : 'md:w-64'}
           w-72
-          ${mobileOpen ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0
+          ${mobileOpen ? 'translate-x-0' : language === 'ar' ? 'translate-x-full' : '-translate-x-full'} md:translate-x-0
         `}
       >
         <div className="flex justify-end items-center mb-4 md:hidden">
@@ -157,7 +159,7 @@ export const Sidebar = memo(function Sidebar() {
                   } ${isCollapsed && !mobileOpen ? 'md:justify-center' : ''}`}
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
-                  {(!isCollapsed || mobileOpen) && <span>{label}</span>}
+                  {(!isCollapsed || mobileOpen) && <span>{t(label)}</span>}
                 </div>
               </Link>
             )
@@ -173,7 +175,7 @@ export const Sidebar = memo(function Sidebar() {
                 } ${isCollapsed && !mobileOpen ? 'md:justify-center' : ''}`}
               >
                 <Shield className="w-5 h-5 flex-shrink-0" />
-                {(!isCollapsed || mobileOpen) && <span>لوحة الأدمن</span>}
+                {(!isCollapsed || mobileOpen) && <span>{t('لوحة الأدمن', 'Admin')}</span>}
               </div>
             </Link>
           )}
@@ -189,7 +191,7 @@ export const Sidebar = memo(function Sidebar() {
             }`}
           >
             {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            {(!isCollapsed || mobileOpen) && <span>{theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}</span>}
+            {(!isCollapsed || mobileOpen) && <span>{theme === 'dark' ? t('الوضع الفاتح', 'Light mode') : t('الوضع الداكن', 'Dark mode')}</span>}
           </button>
 
           {(!isCollapsed || mobileOpen) && (
@@ -207,7 +209,7 @@ export const Sidebar = memo(function Sidebar() {
             }`}
           >
             <LogOut className="w-5 h-5" />
-            {(!isCollapsed || mobileOpen) && <span>تسجيل الخروج</span>}
+            {(!isCollapsed || mobileOpen) && <span>{t('تسجيل الخروج', 'Sign out')}</span>}
           </button>
         </div>
       </aside>
