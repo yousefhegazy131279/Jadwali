@@ -5,139 +5,20 @@ export type TourStep = {
   description: string
   action: 'wait' | 'click' | 'input' | 'select'
   actionTarget?: string
+  autoNextPath?: string
+  autoNextPathPrefix?: string
   required?: boolean
-  autoNextPath?: string // المسار الكامل الذي ننتقل بعده تلقائيًا
-  autoNextPathPrefix?: string // بادئة المسار التي ننتقل بعدها تلقائيًا
-  skipNavigation?: boolean // لا نقوم بتوجيه عند هذه الخطوة
+  skipNavigation?: boolean
 }
 
+// جولة مفاهيمية قصيرة تشرح وظيفة كل مساحة وتترك للمستخدم حرية التجربة.
 export const tourSteps: TourStep[] = [
-  // ========== لوحة التحكم ==========
-  {
-    path: '/dashboard',
-    selector: '[data-tour="dashboard-header"]',
-    title: 'مرحبًا بك في جَدْوَلِي!',
-    description: 'هذه لوحة التحكم الرئيسية. اضغط "التالي" للمتابعة.',
-    action: 'wait',
-  },
-  {
-    path: '/dashboard',
-    selector: '[data-tour="dashboard-stats"]',
-    title: 'الإحصائيات',
-    description: 'هذه البطاقات تعرض ملخص يومك. اضغط "التالي".',
-    action: 'wait',
-  },
-  {
-    path: '/dashboard',
-    selector: '[data-tour="dashboard-timer"]',
-    title: 'المؤقت الدائري',
-    description: 'عند بدء جلسة من جدولك، سيظهر هنا مؤقت دائري. اضغط "التالي".',
-    action: 'wait',
-  },
-  {
-    path: '/dashboard',
-    selector: '[data-tour="dashboard-schedules"]',
-    title: 'الجداول',
-    description: 'اضغط زر "أضف جدولاً جديداً".',
-    action: 'click',
-    actionTarget: 'button[data-tour="dashboard-add-schedule"]',
-    required: true,
-  },
-
-  // ========== المخطط ==========
-  {
-    path: '/dashboard/planner',
-    selector: '[data-tour="planner-title"]',
-    title: 'أدخل عنوان الجدول',
-    description: 'اكتب اسم الجدول في هذا الحقل المظلل.',
-    action: 'input',
-    actionTarget: '[data-tour="planner-title"]',
-    required: true,
-  },
-  {
-    path: '/dashboard/planner',
-    selector: '[data-tour="planner-task"]',
-    title: 'أدخل اسم المهمة',
-    description: 'اكتب اسم المهمة الأولى هنا.',
-    action: 'input',
-    actionTarget: '[data-tour="planner-task"]',
-    required: true,
-  },
-  {
-    path: '/dashboard/planner',
-    selector: 'input[type="date"]',
-    title: 'اختر التاريخ',
-    description: 'اختر تاريخ الجدول.',
-    action: 'input',
-    actionTarget: 'input[type="date"]',
-    required: true,
-  },
-  {
-    path: '/dashboard/planner',
-    selector: 'input[type="time"]',
-    title: 'اختر وقت البدء',
-    description: 'حدد وقت بدء الجدول.',
-    action: 'input',
-    actionTarget: 'input[type="time"]',
-    required: true,
-  },
-  {
-    path: '/dashboard/planner',
-    selector: '[data-tour="planner-create"]',
-    title: 'إنشاء الجدول',
-    description: 'اضغط زر "إنشاء الجدول".',
-    action: 'click',
-    actionTarget: '[data-tour="planner-create"]',
-    required: true,
-    autoNextPathPrefix: '/dashboard/schedule/',
-  },
-
-  // ========== صفحة الجداول ==========
-  {
-    path: '/dashboard/schedule',
-    selector: '[data-tour="schedule-card"]',
-    title: 'افتح جدولك',
-    description: 'اضغط على بطاقة الجدول لفتح تفاصيلها.',
-    action: 'click',
-    actionTarget: '[data-tour="schedule-card"]',
-    required: true,
-    autoNextPathPrefix: '/dashboard/schedule/',
-  },
-
-  // ========== تفاصيل الجدول ==========
-  {
-    path: '/dashboard/schedule', // لن يتم استخدامه بسبب skipNavigation
-    skipNavigation: true,
-    selector: 'button:has(> svg.lucide-play)',
-    title: 'ابدأ الجلسة',
-    description: 'اضغط زر "ابدأ" في أول جلسة.',
-    action: 'click',
-    actionTarget: 'button:has(> svg.lucide-play)',
-    required: true,
-  },
-
-  // ========== المهام ==========
-  {
-    path: '/dashboard/workspace',
-    selector: '[data-tour="workspace-list"]',
-    title: 'المهام',
-    description: 'هنا تستعرض جميع المهام. اضغط "التالي".',
-    action: 'wait',
-  },
-
-  // ========== الإعدادات ==========
-  {
-    path: '/dashboard/settings',
-    selector: 'button[data-tour="toggle-theme"]',
-    title: 'تبديل المظهر',
-    description: 'هذا الزر يبدّل الوضع بين الداكن والفاتح. جرّبه إذا أردت، ثم اضغط "التالي" للمتابعة.',
-    action: 'wait', // ✅ بدون required
-  },
-  {
-    path: '/dashboard/settings',
-    selector: 'button[data-tour="toggle-focus"]',
-    title: 'وضع التركيز',
-    description: 'هذا الزر يفعّل أو يلغي وضع التركيز. جرّبه إذا أردت، ثم اضغط "التالي".',
-    action: 'wait', // ✅ بدون required
-  },
+  { path: '/dashboard', selector: '[data-tour="dashboard-header"]', title: 'مرحبًا بك في جَدْوَلِي', description: 'هذه لوحة التحكم الرئيسية. من هنا ترى ملخص يومك، عدد المهام، الجلسات المتبقية، والجداول القادمة. استخدم القائمة الجانبية للتنقل بين أقسام التطبيق.', action: 'wait' },
+  { path: '/dashboard/planner', selector: 'h1', title: 'المخطط الذكي: ابدأ من هنا', description: 'اكتب عنوان الجدول وتاريخه ووقت البدء، ثم أضف مهامك ومددها. يمكنك اختيار مشروع ومواقيع الصلاة وإعدادات بومودورو قبل إنشاء الجدول. كما يمكنك طلب اقتراح من Jadwool ثم مراجعته قبل استخدامه.', action: 'wait' },
+  { path: '/dashboard/schedule', selector: 'h1', title: 'الجداول والجلسات', description: 'هنا تجد كل جداولك مرتبة حسب التاريخ. افتح أي جدول لرؤية مراحله وصلواته وأعماله الجانبية، ثم ابدأ جلسة التركيز من المرحلة المناسبة.', action: 'wait' },
+  { path: '/dashboard/workspace', selector: 'h1', title: 'مساحة المهام', description: 'تعرض هذه الصفحة المهام في مكان واحد. تابع المهام المكتملة والمتبقية، ونظّم العمل حتى لو لم يكن مرتبطًا بجدول محدد.', action: 'wait' },
+  { path: '/dashboard/projects', selector: 'h1', title: 'المشاريع', description: 'أنشئ مشروعًا لكل هدف أو مادة، ثم اربط به أكثر من جدول. ستشاهد عدد الجداول والمهام ونسبة الإنجاز الخاصة بكل مشروع.', action: 'wait' },
+  { path: '/dashboard/shared', selector: 'h1', title: 'الجداول المشتركة', description: 'شارك جدولًا مع مستخدم آخر بدور مشاهد أو محرر. المشاهد يتابع التقدم، والمحرر يستطيع إنجاز جلسات العمل. يظهر إنجاز كل عضو في بطاقة المساهمات.', action: 'wait' },
+  { path: '/dashboard/analytics', selector: 'h1', title: 'الإحصائيات', description: 'راجع جلساتك المكتملة وساعات التركيز ونسبة إنجاز المهام. بدّل بين العرض اليومي والأسبوعي، وافتح جدول البيانات لقراءة الأرقام بالتفصيل.', action: 'wait' },
+  { path: '/dashboard/settings', selector: 'h1', title: 'الإعدادات والتخصيص', description: 'من هنا تحفظ اسمك ومواقيت الصلاة وإعدادات جلسات التركيز، وتبدّل اللغة بين العربية والإنجليزية والثيم بين الداكن والفاتح. اضغط حفظ التغييرات لتطبيق الإعدادات على الجداول الجديدة.', action: 'wait' },
 ]
