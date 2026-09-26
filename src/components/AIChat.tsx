@@ -1,15 +1,20 @@
 'use client'
+
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useLanguage } from '@/context/LanguageContext'
 import { createClient } from '@/lib/supabase/client'
-import { validateDraft, normalizeDraft, type ScheduleDraft } from '@/lib/scheduleAI'
-import { formatTime12 } from '@/lib/time'
 import {
-  Sparkles,
+  validateJadwoolResponse,
+  normalizeDraft,
+  type ScheduleDraft,
+  type JadwoolResponse,
+} from '@/lib/scheduleAI'
+import { formatTime12 } from '@/lib/time'
+import { JadwoolAvatar } from '@/components/JadwoolAvatar'
+import {
   Send,
   Loader2,
-  Bot,
   User as UserIcon,
   CheckCircle2,
   X,
@@ -18,15 +23,16 @@ import {
   Coffee,
   Calendar as CalendarIcon,
   Wand2,
-  MessageSquare,
   ArrowDown,
   RotateCcw,
+  MessageCircleQuestion,
 } from 'lucide-react'
 
 type ChatMessage = {
   id: string
   role: 'user' | 'assistant'
   content: string
+  options?: string[]
   timestamp: number
 }
 
@@ -50,7 +56,6 @@ export default function AIChat({
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  // ============ Auto scroll ============
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current
     if (!el) return
@@ -61,7 +66,6 @@ export default function AIChat({
     scrollToBottom()
   }, [messages, busy, draft, scrollToBottom])
 
-  // ============ Detect scroll position ============
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
@@ -73,19 +77,18 @@ export default function AIChat({
     return () => el.removeEventListener('scroll', onScroll)
   }, [])
 
-  // ============ Send message ============
-  const send = async (e?: React.FormEvent) => {
-    e?.preventDefault()
-    if (!input.trim() || busy) return
+  const send = async (overrideText?: string) => {
+    const text = (overrideText ?? input).trim()
+    if (!text || busy) return
 
     const userMsg: ChatMessage = {
       id: `u-${Date.now()}`,
       role: 'user',
-      content: input.trim(),
+      content: text,
       timestamp: Date.now(),
     }
 
-    const history = [...messages, userMsg].slice(-11)
+    const history = [...messages, userMsg].slice(-15)
     setBusy(true)
     setError('')
     setMessages(history)
@@ -99,30 +102,50 @@ export default function AIChat({
         },
       })
 
-      
-      if (result.error || !validateDraft(result.data?.draft)) {
-        throw new Error('invalid')
-      }
-      
-      const newDraft = normalizeDraft(result.data.draft as ScheduleDraft)
-      setDraft(newDraft)
+      if (result.error) throw new Error('invoke-failed')
 
-      setMessages(prev => [
-        ...prev,
-        {
-          id: `a-${Date.now()}`,
-          role: 'assistant',
-          content: isArabic
-            ? `✅ اقترحت لك جدولاً بعنوان "${newDraft.title}". راجعه بالأسفل ثم اضغط "استخدم هذا الجدول".`
-            : `✅ I suggested a schedule titled "${newDraft.title}". Review it below and click "Use this schedule".`,
-          timestamp: Date.now(),
-        },
-      ])
+      const response = result.data?.response as JadwoolResponse | undefined
+      if (!response || !validateJadwoolResponse(response)) {
+        throw new Error('invalid-response')
+      }
+
+      // ====== رد: سؤال ======
+      if (response.type === 'question') {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `a-${Date.now()}`,
+            role: 'assistant',
+            content: response.message,
+            options: response.options,
+            timestamp: Date.now(),
+          },
+        ])
+      }
+      // ====== رد: جدول ======
+      else {
+        const schedule = normalizeDraft(response.schedule)
+        setDraft(schedule)
+
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `a-${Date.now()}`,
+            role: 'assistant',
+            content:
+              response.message ||
+              (isArabic
+                ? `✅ جاهز! اقترحت جدولاً بعنوان "${schedule.title}". راجعه بالأسفل.`
+                : `✅ Done! I suggested a schedule titled "${schedule.title}". Review it below.`),
+            timestamp: Date.now(),
+          },
+        ])
+      }
     } catch {
       setError(
         t(
-          'تعذر الحصول على اقتراح. تحقق من الاتصال وتفعيل Jadwool ثم أعد المحاولة.',
-          'Could not get a suggestion. Check your connection and that Jadwool is configured, then retry.'
+          'تعذر الحصول على الرد. تحقق من الاتصال ثم أعد المحاولة.',
+          'Could not get a response. Check your connection and retry.'
         )
       )
     } finally {
@@ -131,7 +154,6 @@ export default function AIChat({
     }
   }
 
-  // ============ Reset ============
   const reset = () => {
     setMessages([])
     setDraft(null)
@@ -139,7 +161,6 @@ export default function AIChat({
     setInput('')
   }
 
-  // ============ Keyboard ============
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -147,7 +168,6 @@ export default function AIChat({
     }
   }
 
-  // ============ Time format ============
   const prettyTime = (time: string) => {
     try {
       return formatTime12(time, language)
@@ -156,27 +176,26 @@ export default function AIChat({
     }
   }
 
-  // ============ Render ============
+  // تحديد حالة الأفاتار
+  const avatarState: 'idle' | 'thinking' | 'happy' = busy
+    ? 'thinking'
+    : draft
+    ? 'happy'
+    : 'idle'
+
   return (
     <section
-      className="relative overflow-hidden rounded-2xl border border-[var(--border-color)] bg-gradient-to-br from-[var(--bg-card)] via-[var(--bg-card)] to-[#D4AF37]/5 backdrop-blur-xl shadow-lg"
+      className="relative rounded-2xl border border-[var(--border-color)] bg-gradient-to-br from-[var(--bg-card)] via-[var(--bg-card)] to-[#D4AF37]/5 backdrop-blur-xl shadow-lg overflow-visible"
       dir={isArabic ? 'rtl' : 'ltr'}
     >
-      {/* Decorative glow */}
+      {/* توهجات خلفية */}
       <div className="pointer-events-none absolute -top-20 -right-20 w-64 h-64 rounded-full bg-[#D4AF37]/10 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-20 -left-20 w-64 h-64 rounded-full bg-blue-500/10 blur-3xl" />
 
       {/* ====== Header ====== */}
       <header className="relative flex items-center justify-between gap-3 px-5 py-4 border-b border-[var(--border-color)]">
         <div className="flex items-center gap-3">
-          <motion.div
-            animate={{ rotate: [0, 8, -8, 0] }}
-            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-            className="relative p-2.5 rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#E8C84A] shadow-md"
-          >
-            <Sparkles className="w-5 h-5 text-[#0b1a2e]" />
-            <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[var(--bg-card)] animate-pulse" />
-          </motion.div>
+          <JadwoolAvatar size={48} state={avatarState} />
           <div>
             <h2 className="text-lg font-bold font-['Amiri'] text-[var(--text-primary)] flex items-center gap-2">
               {t('جَدْوُولْ', 'Jadwool')}
@@ -185,10 +204,11 @@ export default function AIChat({
               </span>
             </h2>
             <p className="text-xs text-[var(--text-muted)] font-['Cairo']">
-              {t(
-                'مساعدك الذكي لبناء جدول اليوم',
-                'Your AI assistant for building today\'s schedule'
-              )}
+              {busy
+                ? t('يفكر...', 'Thinking...')
+                : draft
+                ? t('جدول جاهز', 'Schedule ready')
+                : t('اسألني أي شيء عن يومك', 'Ask me anything about your day')}
             </p>
           </div>
         </div>
@@ -207,26 +227,23 @@ export default function AIChat({
         )}
       </header>
 
-      {/* ====== Messages area ====== */}
+      {/* ====== Messages ====== */}
       <div
         ref={scrollRef}
-        className="relative max-h-[340px] min-h-[180px] overflow-y-auto px-5 py-4 space-y-3 scrollbar-thin scrollbar-thumb-[#D4AF37]/20 scrollbar-track-transparent"
+        className="relative max-h-[400px] min-h-[180px] overflow-y-auto px-5 py-4 space-y-3"
         aria-live="polite"
       >
-        {/* Welcome / empty state */}
         {messages.length === 0 && !busy && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center justify-center text-center py-6 space-y-3"
+            className="flex flex-col items-center justify-center text-center py-6 space-y-4"
           >
-            <div className="p-3 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)]">
-              <MessageSquare className="w-6 h-6 text-[#D4AF37]" />
-            </div>
-            <p className="text-sm text-[var(--text-secondary)] font-['Cairo'] max-w-xs">
+            <JadwoolAvatar size={80} state="idle" />
+            <p className="text-sm text-[var(--text-secondary)] font-['Cairo'] max-w-md">
               {t(
-                'صف لي يومك بحرية، وسأحوّله إلى جدول منظّم جاهز للتطبيق.',
-                'Describe your day freely, and I will turn it into an organized schedule ready to apply.'
+                'مرحباً! أنا جَدْوُولْ 🤖\nصف لي يومك وسأسألك إذا احتجت معلومات إضافية، ثم أقترح جدولاً جاهزاً.',
+                'Hi! I am Jadwool 🤖\nDescribe your day and I will ask if I need more info, then suggest a ready schedule.'
               )}
             </p>
             <div className="flex flex-wrap gap-2 justify-center max-w-sm">
@@ -257,41 +274,56 @@ export default function AIChat({
           </motion.div>
         )}
 
-        {/* Messages */}
         <AnimatePresence initial={false}>
           {messages.map(m => (
             <motion.div
               key={m.id}
-              initial={{ opacity: 0, y: 8, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
               className={`flex gap-2 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}
             >
-              {/* Avatar */}
-              <div
-                className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center shadow-sm ${
-                  m.role === 'user'
-                    ? 'bg-gradient-to-br from-[#D4AF37] to-[#E8C84A]'
-                    : 'bg-gradient-to-br from-blue-500 to-purple-500'
-                }`}
-              >
+              <div className="flex-shrink-0">
                 {m.role === 'user' ? (
-                  <UserIcon className="w-4 h-4 text-[#0b1a2e]" />
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#D4AF37] to-[#E8C84A] flex items-center justify-center shadow-sm">
+                    <UserIcon className="w-4 h-4 text-[#0b1a2e]" />
+                  </div>
                 ) : (
-                  <Bot className="w-4 h-4 text-white" />
+                  <JadwoolAvatar size={32} animated={false} />
                 )}
               </div>
 
-              {/* Bubble */}
-              <div
-                className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed font-['Cairo'] whitespace-pre-wrap break-words ${
-                  m.role === 'user'
-                    ? 'bg-gradient-to-br from-[#D4AF37] to-[#E8C84A] text-[#0b1a2e] rounded-tr-sm'
-                    : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-tl-sm'
-                }`}
-              >
-                {m.content}
+              <div className={`flex flex-col gap-2 max-w-[80%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+                <div
+                  className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed font-['Cairo'] whitespace-pre-wrap break-words ${
+                    m.role === 'user'
+                      ? 'bg-gradient-to-br from-[#D4AF37] to-[#E8C84A] text-[#0b1a2e] rounded-tr-sm'
+                      : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-tl-sm'
+                  }`}
+                >
+                  {m.content}
+                </div>
+
+                {/* خيارات للرد السريع */}
+                {m.options && m.options.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {m.options.map((opt, i) => (
+                      <motion.button
+                        key={i}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.06 }}
+                        whileHover={{ scale: 1.04 }}
+                        whileTap={{ scale: 0.96 }}
+                        onClick={() => send(opt)}
+                        disabled={busy}
+                        className="text-xs px-3 py-1.5 rounded-full bg-[#D4AF37]/10 text-[#D4AF37] hover:bg-[#D4AF37]/20 border border-[#D4AF37]/30 transition-all font-['Cairo'] disabled:opacity-50"
+                      >
+                        {opt}
+                      </motion.button>
+                    ))}
+                  </div>
+                )}
               </div>
             </motion.div>
           ))}
@@ -303,23 +335,17 @@ export default function AIChat({
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
+              exit={{ opacity: 0 }}
               className="flex gap-2"
             >
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
-                <Bot className="w-4 h-4 text-white" />
-              </div>
+              <JadwoolAvatar size={32} state="thinking" />
               <div className="flex items-center gap-1.5 px-4 py-3 rounded-2xl rounded-tl-sm bg-[var(--bg-secondary)] border border-[var(--border-color)]">
                 {[0, 1, 2].map(i => (
                   <motion.span
                     key={i}
                     className="w-2 h-2 rounded-full bg-[#D4AF37]"
                     animate={{ y: [0, -5, 0], opacity: [0.4, 1, 0.4] }}
-                    transition={{
-                      duration: 0.9,
-                      repeat: Infinity,
-                      delay: i * 0.15,
-                    }}
+                    transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.15 }}
                   />
                 ))}
               </div>
@@ -327,7 +353,7 @@ export default function AIChat({
           )}
         </AnimatePresence>
 
-        {/* Scroll to bottom */}
+        {/* Scroll button */}
         <AnimatePresence>
           {showScrollBtn && (
             <motion.button
@@ -335,7 +361,7 @@ export default function AIChat({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               onClick={scrollToBottom}
-              className="sticky bottom-2 mx-auto flex items-center justify-center w-8 h-8 rounded-full bg-[#D4AF37] text-[#0b1a2e] shadow-lg hover:shadow-xl transition-shadow"
+              className="sticky bottom-2 mx-auto flex items-center justify-center w-8 h-8 rounded-full bg-[#D4AF37] text-[#0b1a2e] shadow-lg"
               aria-label={t('التمرير للأسفل', 'Scroll to bottom')}
             >
               <ArrowDown className="w-4 h-4" />
@@ -352,10 +378,9 @@ export default function AIChat({
             animate={{ opacity: 1, y: 0, height: 'auto' }}
             exit={{ opacity: 0, y: -20, height: 0 }}
             transition={{ type: 'spring', stiffness: 260, damping: 28 }}
-            className="relative overflow-hidden border-t border-[#D4AF37]/30 bg-gradient-to-br from-[#D4AF37]/8 via-transparent to-blue-500/5"
+            className="border-t border-[#D4AF37]/30 bg-gradient-to-br from-[#D4AF37]/8 via-transparent to-blue-500/5 overflow-hidden"
           >
             <div className="px-5 py-4 space-y-3">
-              {/* Header */}
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded-lg bg-[#D4AF37]/20 text-[#D4AF37]">
@@ -379,30 +404,35 @@ export default function AIChat({
                 </div>
                 <button
                   onClick={() => setDraft(null)}
-                  className="p-1.5 rounded-lg hover:bg-red-500/10 text-[var(--text-muted)] hover:text-red-400 transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-red-500/10 text-[var(--text-muted)] hover:text-red-400"
                   aria-label={t('إلغاء', 'Cancel')}
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Stats chips */}
+              {draft.notes && (
+                <div className="flex items-start gap-2 p-2.5 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                  <MessageCircleQuestion className="w-3.5 h-3.5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-[var(--text-secondary)] font-['Cairo'] leading-relaxed">
+                    {draft.notes}
+                  </p>
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-2">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#D4AF37]/10 text-[#D4AF37] text-xs font-['Cairo'] border border-[#D4AF37]/20">
                   <ListChecks className="w-3 h-3" />
-                  {draft.tasks.length}{' '}
-                  {t('مهام', 'tasks')}
+                  {draft.tasks.length} {t('مهام', 'tasks')}
                 </span>
                 {draft.sideTasks && draft.sideTasks.length > 0 && (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 text-xs font-['Cairo'] border border-blue-500/20">
                     <Coffee className="w-3 h-3" />
-                    {draft.sideTasks.length}{' '}
-                    {t('جانبية', 'side')}
+                    {draft.sideTasks.length} {t('جانبية', 'side')}
                   </span>
                 )}
               </div>
 
-              {/* Tasks list */}
               {draft.tasks.length > 0 && (
                 <div>
                   <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--text-secondary)] font-['Cairo'] mb-2">
@@ -416,16 +446,16 @@ export default function AIChat({
                         initial={{ opacity: 0, x: -8 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: i * 0.04 }}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-card)]/60 border border-[var(--border-color)] hover:border-[#D4AF37]/30 transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-card)]/60 border border-[var(--border-color)]"
                       >
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] flex-shrink-0" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]" />
                         <span className="flex-1 text-sm text-[var(--text-primary)] font-['Cairo'] truncate">
                           {task.name}
                         </span>
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] text-[var(--text-muted)] font-['Cairo']">
                           {task.category}
                         </span>
-                        <span className="text-xs text-[var(--text-muted)] font-['Cairo'] whitespace-nowrap">
+                        <span className="text-xs text-[var(--text-muted)] font-['Cairo']">
                           {task.duration_minutes} {t('د', 'm')}
                         </span>
                       </motion.li>
@@ -434,7 +464,6 @@ export default function AIChat({
                 </div>
               )}
 
-              {/* Side tasks list */}
               {draft.sideTasks && draft.sideTasks.length > 0 && (
                 <div>
                   <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--text-secondary)] font-['Cairo'] mb-2">
@@ -448,9 +477,9 @@ export default function AIChat({
                         initial={{ opacity: 0, x: -8 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: i * 0.04 }}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-card)]/60 border border-[var(--border-color)] hover:border-blue-500/30 transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-card)]/60 border border-[var(--border-color)]"
                       >
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
                         <span className="flex-1 text-sm text-[var(--text-primary)] font-['Cairo'] truncate">
                           {side.name}
                         </span>
@@ -460,13 +489,12 @@ export default function AIChat({
                 </div>
               )}
 
-              {/* Apply button */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => onApply(draft)}
                 disabled={busy}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#E8C84A] text-[#0b1a2e] font-bold font-['Cairo'] text-sm shadow-md hover:shadow-lg hover:shadow-[#D4AF37]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#E8C84A] text-[#0b1a2e] font-bold font-['Cairo'] text-sm shadow-md hover:shadow-lg hover:shadow-[#D4AF37]/30 transition-all disabled:opacity-50"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 {t('استخدم هذا الجدول', 'Use this schedule')}
@@ -493,9 +521,15 @@ export default function AIChat({
         )}
       </AnimatePresence>
 
-      {/* ====== Input area ====== */}
+      {/* ====== Input ====== */}
       <div className="relative border-t border-[var(--border-color)] bg-[var(--bg-card)]/40 px-4 py-3">
-        <form onSubmit={send} className="flex items-end gap-2">
+        <form
+          onSubmit={e => {
+            e.preventDefault()
+            send()
+          }}
+          className="flex items-end gap-2"
+        >
           <div className="flex-1 relative">
             <textarea
               ref={inputRef}
@@ -505,14 +539,11 @@ export default function AIChat({
               maxLength={3000}
               rows={1}
               disabled={busy}
-              required
-              aria-label={t('رسالتك إلى جدوول', 'Your message to Jadwool')}
               placeholder={t(
                 'صف مهامك ووقتك المتاح…',
                 'Describe your tasks and available time…'
               )}
               className="w-full resize-none px-4 py-3 pe-12 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20 transition-all font-['Cairo'] text-sm min-h-[44px] max-h-32"
-              style={{ height: 'auto' }}
               onInput={e => {
                 const el = e.currentTarget
                 el.style.height = 'auto'
@@ -529,14 +560,10 @@ export default function AIChat({
             whileHover={{ scale: busy ? 1 : 1.05 }}
             whileTap={{ scale: busy ? 1 : 0.95 }}
             disabled={busy || !input.trim()}
-            className="flex-shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#E8C84A] text-[#0b1a2e] flex items-center justify-center shadow-md hover:shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#E8C84A] text-[#0b1a2e] flex items-center justify-center shadow-md hover:shadow-lg transition-all disabled:opacity-40"
             aria-label={t('إرسال', 'Send')}
           >
-            {busy ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <Send className="w-5 h-5" />
-            )}
+            {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
           </motion.button>
         </form>
 
@@ -546,7 +573,10 @@ export default function AIChat({
             <span className="text-[#D4AF37] font-bold">Groq · Llama 3.3</span>
           </span>
           <span className="hidden sm:inline">
-            {t('Enter للإرسال · Shift+Enter لسطر جديد', 'Enter to send · Shift+Enter for new line')}
+            {t(
+              'Enter للإرسال · Shift+Enter لسطر جديد',
+              'Enter to send · Shift+Enter for new line'
+            )}
           </span>
         </div>
       </div>
