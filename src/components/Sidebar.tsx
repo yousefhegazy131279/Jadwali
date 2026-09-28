@@ -6,6 +6,7 @@ import { useSupabase } from '@/lib/supabaseProvider'
 import { useTheme } from '@/context/ThemeContext'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Logo } from '@/components/Logo'
+import { AccountAvatar } from '@/components/AccountAvatar'
 import { LanguageToggle, useLanguage } from '@/context/LanguageContext'
 import { useState, useEffect, memo } from 'react'
 import {
@@ -147,7 +148,6 @@ export const Sidebar = memo(function Sidebar() {
   const collapsed = isCollapsed && !mobileOpen && mounted
   const showLabels = !collapsed
 
-  const userInitial = (user?.email || '?').charAt(0).toUpperCase()
   const userName = user?.email?.split('@')[0] || t('مستخدم', 'User')
 
   return (
@@ -334,9 +334,7 @@ export const Sidebar = memo(function Sidebar() {
               }`}
             >
               <div className="relative shrink-0">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#E8C84A] font-['Cairo'] text-sm font-bold text-[#0b1a2e] shadow-md">
-                  {userInitial}
-                </div>
+                <AccountAvatar size={36} className="rounded-xl text-sm shadow-md" />
                 <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[var(--bg-card)] bg-emerald-500" />
               </div>
               {!collapsed && (

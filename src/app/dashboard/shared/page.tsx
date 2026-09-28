@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSupabase } from '@/lib/supabaseProvider'
+import Image from 'next/image'
 import { useLanguage } from '@/context/LanguageContext'
 import { createClient } from '@/lib/supabase/client'
 import { formatTime12 } from '@/lib/time'
@@ -36,6 +37,7 @@ type Member = {
   user_id: string
   role: Role
   full_name: string
+  avatar_url: string | null
 }
 
 type SharedSchedule = {
@@ -48,6 +50,7 @@ type SharedSchedule = {
   members: Member[]
   other_members_count: number
   owner_name: string
+  owner_avatar_url: string | null
   is_owner: boolean
   is_truly_shared: boolean
 }
@@ -149,12 +152,12 @@ function MemberAvatars({
       {shown.map((m) => (
         <div
           key={m.user_id}
-          className={`flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br ${getAvatarColor(
+          className={`relative flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br ${getAvatarColor(
             m.full_name || m.user_id
           )} text-[10px] font-bold text-white ring-2 ring-[var(--bg-card)]`}
           title={m.full_name || m.user_id}
         >
-          {(m.full_name || '?').charAt(0).toUpperCase()}
+          {m.avatar_url ? <Image src={m.avatar_url} alt="" fill sizes="28px" unoptimized className="object-cover" /> : (m.full_name || '?').charAt(0).toUpperCase()}
         </div>
       ))}
       {remaining > 0 && (
@@ -241,11 +244,11 @@ function SharedScheduleCard({
         {/* صاحب الجدول */}
         <div className="mb-5 flex items-center gap-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-2.5">
           <div
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${
+            className={`relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br ${
               roleMeta.owner.gradient
             } text-xs font-bold text-[#0b1a2e]`}
           >
-            {(item.owner_name || '?').charAt(0).toUpperCase()}
+            {item.owner_avatar_url ? <Image src={item.owner_avatar_url} alt="" fill sizes="32px" unoptimized className="object-cover" /> : (item.owner_name || '?').charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-['Cairo'] text-[var(--text-muted)]">
@@ -343,11 +346,16 @@ export default function SharedPage() {
         profileIds.size > 0
           ? await supabase
               .from('profiles')
-              .select('id, full_name')
+            .select('id, full_name, avatar_url')
               .in('id', Array.from(profileIds))
-          : { data: [] as { id: string; full_name: string | null }[] }
+          : { data: [] as { id: string; full_name: string | null; avatar_url: string | null }[] }
 
-      const profileMap = new Map((profiles ?? []).map((p) => [p.id, p.full_name ?? '']))
+      const avatarPaths = [...new Set((profiles ?? []).map((p) => p.avatar_url).filter((path): path is string => !!path))]
+      const { data: signedAvatars } = avatarPaths.length
+        ? await supabase.storage.from('avatars').createSignedUrls(avatarPaths, 86400)
+        : { data: [] as { path: string; signedUrl: string }[] }
+      const signedAvatarMap = new Map((signedAvatars ?? []).filter((avatar) => avatar.signedUrl).map((avatar) => [avatar.path, avatar.signedUrl]))
+      const profileMap = new Map((profiles ?? []).map((p) => [p.id, { name: p.full_name ?? '', avatar: p.avatar_url ? signedAvatarMap.get(p.avatar_url) ?? null : null }]))
 
       /* 7) تجميع الأعضاء */
       const membersBySchedule = new Map<string, Member[]>()
@@ -356,7 +364,8 @@ export default function SharedPage() {
         membersBySchedule.get(m.schedule_id)!.push({
           user_id: m.user_id,
           role: m.role as Role,
-          full_name: profileMap.get(m.user_id) ?? '',
+          full_name: profileMap.get(m.user_id)?.name ?? '',
+          avatar_url: profileMap.get(m.user_id)?.avatar ?? null,
         })
       }
 
@@ -380,7 +389,8 @@ export default function SharedPage() {
           role: myRole,
           members,
           other_members_count: others.length,
-          owner_name: profileMap.get(s.user_id) ?? '',
+          owner_name: profileMap.get(s.user_id)?.name ?? '',
+          owner_avatar_url: profileMap.get(s.user_id)?.avatar ?? null,
           is_owner: isOwner,
           is_truly_shared: others.length > 0,
         }

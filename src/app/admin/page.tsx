@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { useSupabase } from '@/lib/supabaseProvider'
+import Image from 'next/image'
 import { toast } from 'sonner'
 import {
   Users, Calendar, ListChecks, CheckCircle2, Clock, TrendingUp,
@@ -24,6 +25,7 @@ type Profile = {
   id: string
   email: string | null
   full_name: string | null
+  avatar_url: string | null
   role: string
   created_at: string
 }
@@ -257,6 +259,12 @@ export default function AdminPage() {
       const profilesData = profilesRes.data || []
       const schedulesData = schedulesRes.data || []
       const tasksData = tasksRes.data || []
+      const avatarPaths = [...new Set(profilesData.map((profile) => profile.avatar_url).filter((path): path is string => !!path))]
+      const { data: signedAvatars } = avatarPaths.length
+        ? await supabase.storage.from('avatars').createSignedUrls(avatarPaths, 86400)
+        : { data: [] as { path: string; signedUrl: string }[] }
+      const signedAvatarMap = new Map((signedAvatars ?? []).filter((avatar) => avatar.signedUrl).map((avatar) => [avatar.path, avatar.signedUrl]))
+      for (const profile of profilesData) profile.avatar_url = profile.avatar_url ? signedAvatarMap.get(profile.avatar_url) ?? null : null
 
       setGlobalStats({
         totalUsers: profilesData.length,
@@ -707,9 +715,9 @@ export default function AdminPage() {
                       <div className="flex min-w-0 flex-1 items-center gap-3">
                         <div className="relative shrink-0">
                           <div
-                            className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${getAvatarColor(name)} font-['Cairo'] text-base font-bold text-white shadow-md`}
+                            className={`relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br ${getAvatarColor(name)} font-['Cairo'] text-base font-bold text-white shadow-md`}
                           >
-                            {name.charAt(0).toUpperCase()}
+                            {userStat.profile.avatar_url ? <Image src={userStat.profile.avatar_url} alt="" fill sizes="44px" unoptimized className="object-cover" /> : name.charAt(0).toUpperCase()}
                           </div>
                           <div
                             className={`absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[var(--bg-card)] ${

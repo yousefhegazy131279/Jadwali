@@ -2,10 +2,11 @@
 
 import { formatTime12 } from '@/lib/time'
 import { useLanguage } from '@/context/LanguageContext'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { useSupabase } from '@/lib/supabaseProvider'
+import { AccountAvatar } from '@/components/AccountAvatar'
 import { useTheme } from '@/context/ThemeContext'
 import { toast } from 'sonner'
 import { isTime, normalizePrayerTimes } from '@/lib/preferences'
@@ -13,7 +14,7 @@ import {
   Save, Loader2, Sun, Moon, Clock, Zap, RefreshCw, CheckCircle2,
   User, Settings as SettingsIcon, Sparkles, Palette, Timer,
   Coffee, Repeat, Sunrise, Sunset, CloudMoon, Star, Bell,
-  Shield, ChevronDown, Info, RotateCcw, Wand2, Eye,
+  Shield, ChevronDown, Info, RotateCcw, Wand2, Eye, Camera, ImagePlus,
 } from 'lucide-react'
 
 /* ============================================================
@@ -244,7 +245,7 @@ function NumberField({
    ============================================================ */
 export default function SettingsPage() {
   const { t, language } = useLanguage()
-  const { user, fullName, updateFullName } = useSupabase()
+  const { user, fullName, avatarUrl, updateAvatarUrl, updateFullName } = useSupabase()
   const { theme, toggleTheme } = useTheme()
 
   const [settings, setSettings] = useState<Settings | null>(null)
@@ -257,6 +258,8 @@ export default function SettingsPage() {
 
   const [name, setName] = useState(fullName || '')
   const [savingName, setSavingName] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const avatarInput = useRef<HTMLInputElement>(null)
 
   const [focusMode, setFocusMode] = useState(() => {
     if (typeof window !== 'undefined') return localStorage.getItem('focusMode') === 'true'
@@ -404,6 +407,37 @@ export default function SettingsPage() {
     }
   }
 
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !user) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error(t('اختر صورة JPG أو PNG أو WebP', 'Choose a JPG, PNG, or WebP image'))
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error(t('حجم الصورة يجب ألا يتجاوز 2 ميجابايت', 'Image must be 2 MB or smaller'))
+      return
+    }
+
+    setUploadingAvatar(true)
+    try {
+      const supabase = createClient()
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(
+        `${user.id}/avatar`, file, { upsert: true, cacheControl: '0', contentType: file.type }
+      )
+      if (uploadError) throw uploadError
+      const { data } = supabase.storage.from('avatars').getPublicUrl(`${user.id}/avatar`)
+      await updateAvatarUrl(`${user.id}/avatar`)
+      toast.success(t('تم تحديث الصورة الشخصية', 'Profile photo updated'))
+    } catch (error) {
+      console.error('Avatar upload failed', error)
+      toast.error(t('تعذر رفع الصورة. تحقق من إعدادات التخزين ثم أعد المحاولة.', 'Could not upload the photo. Check storage setup and try again.'))
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
+
   /* ====== حالة عدم الحفظ ====== */
   const isDirty = useMemo(() => {
     if (!settings) return false
@@ -523,9 +557,7 @@ export default function SettingsPage() {
             {/* معاينة الأفاتار */}
             <div className="flex items-center gap-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)]/50 p-4">
               <div className="relative">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#D4AF37] to-[#E8C84A] font-['Cairo'] text-xl font-bold text-[#0b1a2e] shadow-lg">
-                  {(name || '?').charAt(0).toUpperCase()}
-                </div>
+                <AccountAvatar size={56} className="rounded-2xl text-xl shadow-lg" />
                 <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[var(--bg-card)] bg-emerald-500">
                   <CheckCircle2 className="h-2.5 w-2.5 text-white" strokeWidth={3} />
                 </div>
@@ -538,6 +570,11 @@ export default function SettingsPage() {
                   {user?.email || ''}
                 </div>
               </div>
+              <input ref={avatarInput} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={handleAvatarUpload} />
+              <button type="button" onClick={() => avatarInput.current?.click()} disabled={uploadingAvatar} className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-[#D4AF37]/30 bg-[#D4AF37]/10 px-3 py-2 font-['Cairo'] text-xs font-bold text-[#D4AF37] transition-colors hover:bg-[#D4AF37]/20 disabled:opacity-50">
+                {uploadingAvatar ? <Loader2 className="h-4 w-4 animate-spin" /> : avatarUrl ? <Camera className="h-4 w-4" /> : <ImagePlus className="h-4 w-4" />}
+                <span className="hidden sm:inline">{uploadingAvatar ? t('جارٍ الرفع', 'Uploading') : t('تغيير الصورة', 'Change photo')}</span>
+              </button>
             </div>
 
             <div className="flex gap-2">

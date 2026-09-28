@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
+import Image from 'next/image'
 import { useLanguage } from '@/context/LanguageContext'
 import { toast } from 'sonner'
 import {
@@ -29,6 +30,7 @@ export type MemberProgress = {
   role: string
   sessions: number
   minutes: number
+  avatar_url?: string | null
 }
 
 /* ============================================================
@@ -140,9 +142,9 @@ function MemberCard({
         <div className="flex items-start gap-3">
           {/* الأفاتار */}
           <div
-            className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${avatarColor} font-['Cairo'] text-base font-bold text-white shadow-md`}
+            className={`relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br ${avatarColor} font-['Cairo'] text-base font-bold text-white shadow-md`}
           >
-            {initial}
+            {member.avatar_url ? <Image src={member.avatar_url} alt="" fill sizes="44px" unoptimized className="object-cover" /> : initial}
             <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[var(--bg-secondary)] bg-[var(--bg-card)]">
               <RoleIcon className={`h-2.5 w-2.5 ${meta.text}`} />
             </div>
@@ -232,9 +234,20 @@ export default function SharingPanel({
     })
     setError(!!result.error)
     if (!result.error) {
-      const data = result.data ?? []
-      setMembers(data)
-      onRole?.(data)
+      const data = (result.data ?? []) as MemberProgress[]
+      const ids = data.map((member) => member.user_id)
+      const { data: profiles } = ids.length
+        ? await createClient().from('profiles').select('id,avatar_url').in('id', ids)
+        : { data: [] as { id: string; avatar_url: string | null }[] }
+      const paths = [...new Set((profiles ?? []).map((profile) => profile.avatar_url).filter((path): path is string => !!path))]
+      const { data: signedAvatars } = paths.length
+        ? await createClient().storage.from('avatars').createSignedUrls(paths, 86400)
+        : { data: [] as { path: string; signedUrl: string }[] }
+      const signedAvatarMap = new Map((signedAvatars ?? []).filter((avatar) => avatar.signedUrl).map((avatar) => [avatar.path, avatar.signedUrl]))
+      const avatars = new Map((profiles ?? []).map((profile) => [profile.id, profile.avatar_url ? signedAvatarMap.get(profile.avatar_url) ?? null : null]))
+      const membersWithAvatars = data.map((member) => ({ ...member, avatar_url: avatars.get(member.user_id) ?? null }))
+      setMembers(membersWithAvatars)
+      onRole?.(membersWithAvatars)
     }
   }, [scheduleId, onRole])
 

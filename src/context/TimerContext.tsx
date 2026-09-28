@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useSupabase } from '@/lib/supabaseProvider'
 import { completedPhaseCount, remainingSeconds, taskSessionNumber } from '@/lib/progress'
+import { playSessionSound, unlockSessionSound } from '@/lib/sessionSound'
 
 type Phase = {
   type: 'work' | 'shortBreak' | 'longBreak'
@@ -90,6 +91,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
       } : { ...previous, isRunning: false, isPaused: false, currentPhaseIndex: null,
         timeLeft: 0, endTime: null, completedPhases: previous.phases.length, taskName: null, sessionNumber: null })
       window.dispatchEvent(new Event('jadwali-progress'))
+      playSessionSound()
       toast.success(next ? tr('✅ اكتملت الجلسة') : tr('🎉 اكتملت جميع الجلسات!'))
     } catch {
       if (account.current === userId && stateRef.current.scheduleId === previous.scheduleId) {
@@ -141,6 +143,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   }, [user?.id, resetTimer, publish])
 
   const startTimer = useCallback((scheduleId: string, scheduleTitle: string, phases: Phase[], index: number) => {
+    unlockSessionSound()
     const phase = phases[index]
     if (!phase || !account.current || busy.current) return
     if ((stateRef.current.isRunning || stateRef.current.isPaused) && stateRef.current.scheduleId !== scheduleId) {
@@ -157,6 +160,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
       timeLeft: remainingSeconds(state.endTime, state.timeLeft), endTime: null })
   }, [publish])
   const resumeTimer = useCallback(() => {
+    unlockSessionSound()
     const state = stateRef.current
     if (state.isPaused) publish({ ...state, isRunning: true, isPaused: false,
       endTime: new Date(Date.now() + state.timeLeft * 1000).toISOString() })

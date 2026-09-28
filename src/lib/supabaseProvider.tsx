@@ -8,9 +8,11 @@ type SupabaseContextType = {
   supabase: ReturnType<typeof createClient>
   user: any | null
   fullName: string | null
+  avatarUrl: string | null
   isAdmin: boolean | null
   isLoading: boolean // ✅ أضفنا هذا
   updateFullName: (name: string) => Promise<void>
+  updateAvatarUrl: (url: string) => Promise<void>
 }
 
 const SupabaseContext = createContext<SupabaseContextType | undefined>(undefined)
@@ -21,6 +23,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const [supabase] = useState(() => createClient())
   const [user, setUser] = useState<any | null>(null)
   const [fullName, setFullName] = useState<string | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
   const [isLoading, setIsLoading] = useState(true) // ✅ حالة التحميل
 
@@ -32,7 +35,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     // Never await a Supabase query inside the auth callback: the auth lock is held.
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
-      if (!session?.user) { setFullName(null); setIsAdmin(false); setIsLoading(false) }
+      if (!session?.user) { setFullName(null); setAvatarUrl(null); setIsAdmin(false); setIsLoading(false) }
     })
     return () => { active = false; listener.subscription.unsubscribe() }
   }, [supabase])
@@ -42,9 +45,13 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     let active = true
     setIsLoading(true)
     setIsAdmin(null)
-    void supabase.from('profiles').select('role,full_name').eq('id', user.id).maybeSingle().then(({ data }) => {
+    void supabase.from('profiles').select('role,full_name,avatar_url').eq('id', user.id).maybeSingle().then(async ({ data }) => {
       if (!active) return
       setFullName(data?.full_name || user.user_metadata?.full_name || user.user_metadata?.name || null)
+      if (data?.avatar_url) {
+        const { data: signed } = await supabase.storage.from('avatars').createSignedUrl(data.avatar_url, 86400)
+        if (active) setAvatarUrl(signed?.signedUrl ?? null)
+      } else setAvatarUrl(null)
       setIsAdmin(data?.role === 'admin')
       setIsLoading(false)
     })
@@ -74,9 +81,21 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const updateAvatarUrl = async (url: string) => {
+    if (!user) return
+    const { error } = await supabase.from('profiles').upsert(
+      { id: user.id, email: user.email, full_name: fullName, avatar_url: url },
+      { onConflict: 'id' }
+    )
+    if (error) throw error
+    const { data: signed, error: signedError } = await supabase.storage.from('avatars').createSignedUrl(url, 86400)
+    if (signedError) throw signedError
+    setAvatarUrl(signed.signedUrl)
+  }
+
   return (
     <SupabaseContext.Provider
-      value={{ supabase, user, fullName, isAdmin, isLoading, updateFullName }}
+      value={{ supabase, user, fullName, avatarUrl, isAdmin, isLoading, updateFullName, updateAvatarUrl }}
     >
       {children}
     </SupabaseContext.Provider>

@@ -5,6 +5,7 @@ import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { useSupabase } from '@/lib/supabaseProvider'
+import { AccountAvatar } from '@/components/AccountAvatar'
 import { useRouter } from 'next/navigation'
 import { Clock } from '@/components/Clock'
 import { NeonParticles } from '@/components/NeonParticles'
@@ -798,9 +799,7 @@ export default function DashboardPage() {
 
               {/* المستخدم */}
               <div className="hidden items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2 sm:flex">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-[#D4AF37] to-[#E8C84A] font-mono text-[10px] font-bold text-[#0b1a2e]">
-                  {(fullName || '?').charAt(0).toUpperCase()}
-                </div>
+                <AccountAvatar size={24} className="font-mono text-[10px]" />
                 <span className="max-w-[120px] truncate font-['Cairo'] text-xs font-bold text-[var(--text-primary)]">
                   {fullName || t('مستخدم', 'User')}
                 </span>
