@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSupabase } from '@/lib/supabaseProvider'
 import { useLanguage } from '@/context/LanguageContext'
+import { toast } from 'sonner'
 import { formatTime12 } from '@/lib/time'
 import {
   ArrowRight,
@@ -25,6 +26,9 @@ import {
   Target,
   Zap,
   Coffee,
+  Plus,
+  Search,
+  X,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ar, enUS } from 'date-fns/locale'
@@ -46,6 +50,7 @@ type Schedule = {
   title: string
   day: string
   start_time: string
+  project_id?: string | null
   pomodoro?: {
     workDuration: number
     shortBreak: number
@@ -53,6 +58,14 @@ type Schedule = {
     cyclesBeforeLong: number
   }
   tasks: Task[]
+}
+
+type AvailableSchedule = {
+  id: string
+  title: string
+  day: string
+  project_id: string | null
+  project_name: string | null
 }
 
 type StandaloneTask = {
@@ -327,6 +340,11 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<Project | null>(null)
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [standaloneTasks, setStandaloneTasks] = useState<StandaloneTask[]>([])
+  const [availableSchedules, setAvailableSchedules] = useState<AvailableSchedule[]>([])
+  const [showSchedulePicker, setShowSchedulePicker] = useState(false)
+  const [loadingAvailableSchedules, setLoadingAvailableSchedules] = useState(false)
+  const [linkingScheduleId, setLinkingScheduleId] = useState<string | null>(null)
+  const [scheduleSearch, setScheduleSearch] = useState('')
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
   useEffect(() => {
@@ -374,6 +392,76 @@ export default function ProjectDetailPage() {
       active = false
     }
   }, [id, user?.id, supabase])
+
+  const toggleSchedulePicker = async () => {
+    if (showSchedulePicker) {
+      setShowSchedulePicker(false)
+      return
+    }
+    setShowSchedulePicker(true)
+    setScheduleSearch('')
+    if (!user) return
+
+    setLoadingAvailableSchedules(true)
+    const [schedulesRes, projectsRes] = await Promise.all([
+      supabase
+        .from('schedules')
+        .select('id, title, day, project_id')
+        .eq('user_id', user.id)
+        .order('day', { ascending: false }),
+      supabase.from('projects').select('id, name').eq('user_id', user.id),
+    ])
+    setLoadingAvailableSchedules(false)
+
+    if (schedulesRes.error || projectsRes.error) {
+      toast.error(t('تعذر تحميل الجداول المتاحة', 'Could not load available schedules'))
+      return
+    }
+
+    const projectNames = new Map((projectsRes.data ?? []).map((item) => [item.id, item.name]))
+    setAvailableSchedules(
+      (schedulesRes.data ?? [])
+        .filter((item) => item.project_id !== String(id))
+        .map((item) => ({
+          ...item,
+          project_name: item.project_id ? projectNames.get(item.project_id) ?? null : null,
+        }))
+    )
+  }
+
+  const attachSchedule = async (schedule: AvailableSchedule) => {
+    if (!user || !project || linkingScheduleId) return
+    setLinkingScheduleId(schedule.id)
+    const { error } = await supabase
+      .from('schedules')
+      .update({ project_id: project.id })
+      .eq('id', schedule.id)
+      .eq('user_id', user.id)
+
+    if (!error) {
+      const { data, error: loadError } = await supabase
+        .from('schedules')
+        .select('id, title, day, start_time, pomodoro, tasks(id, name, done, completed_sessions, duration, type)')
+        .eq('id', schedule.id)
+        .eq('user_id', user.id)
+        .single()
+
+      if (!loadError && data) {
+        setSchedules((current) => [...current, data].sort((a, b) => b.day.localeCompare(a.day)))
+      }
+      setAvailableSchedules((current) => current.filter((item) => item.id !== schedule.id))
+      window.dispatchEvent(new Event('jadwali-progress'))
+      toast.success(t('تمت إضافة الجدول إلى المشروع', 'Schedule added to project'))
+    } else {
+      console.error('Attach schedule failed:', error)
+      toast.error(t('تعذرت إضافة الجدول. حاول مرة أخرى.', 'Could not add the schedule. Please try again.'))
+    }
+    setLinkingScheduleId(null)
+  }
+
+  const filteredAvailableSchedules = availableSchedules.filter((schedule) =>
+    schedule.title.toLocaleLowerCase().includes(scheduleSearch.trim().toLocaleLowerCase())
+  )
 
   /* ====== الإحصائيات ====== */
   const stats = useMemo(() => {
@@ -570,7 +658,7 @@ export default function ProjectDetailPage() {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
         {/* ===== الجداول (العمود الأكبر) ===== */}
         <div className="space-y-4 lg:col-span-8">
-          <div className="flex items-center gap-2.5 px-1">
+          <div className="flex flex-wrap items-center gap-2.5 px-1">
             <div
               className="flex h-8 w-8 items-center justify-center rounded-xl"
               style={{ background: hexToRgba(projectColor, 0.15) }}
@@ -585,7 +673,82 @@ export default function ProjectDetailPage() {
                 {schedules.length} {t('جدول', 'schedules')}
               </p>
             </div>
+            <button
+              type="button"
+              onClick={() => void toggleSchedulePicker()}
+              className="ms-auto inline-flex items-center gap-2 rounded-xl border px-3 py-2 font-['Cairo'] text-xs font-bold transition-colors hover:bg-[var(--bg-secondary)]"
+              style={{ borderColor: hexToRgba(projectColor, 0.35), color: projectColor }}
+            >
+              {showSchedulePicker ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              {showSchedulePicker ? t('إغلاق', 'Close') : t('إضافة جدول', 'Add schedule')}
+            </button>
           </div>
+
+          <AnimatePresence>
+            {showSchedulePicker && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4"
+              >
+                <div className="mb-3">
+                  <h3 className="font-['Amiri'] text-base font-bold text-[var(--text-primary)]">
+                    {t('اختر جدولاً لإضافته', 'Choose a schedule to add')}
+                  </h3>
+                  <p className="mt-0.5 font-['Cairo'] text-[11px] text-[var(--text-muted)]">
+                    {t('يمكنك إضافة جدول غير مرتبط أو نقله من مشروع آخر.', 'Add an unassigned schedule or move one from another project.')}
+                  </p>
+                </div>
+                <div className="relative mb-3">
+                  <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+                  <input
+                    value={scheduleSearch}
+                    onChange={(event) => setScheduleSearch(event.target.value)}
+                    placeholder={t('ابحث عن جدول…', 'Search schedules…')}
+                    className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] py-2.5 ps-9 pe-3 font-['Cairo'] text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[#D4AF37]/50"
+                  />
+                </div>
+                <div className="max-h-72 space-y-2 overflow-y-auto overscroll-contain">
+                  {loadingAvailableSchedules ? (
+                    <div className="flex items-center justify-center gap-2 py-8 font-['Cairo'] text-sm text-[var(--text-muted)]">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {t('جارٍ تحميل الجداول…', 'Loading schedules…')}
+                    </div>
+                  ) : filteredAvailableSchedules.length ? filteredAvailableSchedules.map((schedule) => (
+                    <div key={schedule.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)]/60 p-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-['Cairo'] text-sm font-bold text-[var(--text-primary)]">{schedule.title}</p>
+                        <p className="mt-0.5 font-['Cairo'] text-[10px] text-[var(--text-muted)]">
+                          {format(new Date(schedule.day), 'd MMM yyyy', { locale: language === 'ar' ? ar : enUS })}
+                          <span className="mx-1.5">·</span>
+                          {schedule.project_name
+                            ? t(`مرتبط بـ ${schedule.project_name}`, `Currently in ${schedule.project_name}`)
+                            : t('غير مرتبط بمشروع', 'Not linked to a project')}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void attachSchedule(schedule)}
+                        disabled={!!linkingScheduleId}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 font-['Cairo'] text-xs font-bold text-[#0b1a2e] shadow-sm transition-opacity disabled:opacity-60"
+                        style={{ background: projectColor }}
+                      >
+                        {linkingScheduleId === schedule.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                        {t('إضافة', 'Add')}
+                      </button>
+                    </div>
+                  )) : (
+                    <p className="py-8 text-center font-['Cairo'] text-sm text-[var(--text-muted)]">
+                      {scheduleSearch.trim()
+                        ? t('لا توجد جداول تطابق البحث.', 'No schedules match your search.')
+                        : t('لا توجد جداول أخرى لإضافتها.', 'There are no other schedules to add.')}
+                    </p>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {schedules.length === 0 ? (
             <motion.div
