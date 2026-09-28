@@ -890,7 +890,7 @@ export default function ScheduleDetailPage() {
     }
     const phase = phases[index]
     if (!phase) return
-    startGlobalTimer(schedule!.id, schedule!.title, phases, index)
+    if (!startGlobalTimer(schedule!.id, schedule!.title, phases, index)) return
     setCurrentPhaseIndex(index)
     toast.success(`🎯 ${tr('بدأت الجلسة', 'Session started')}`)
   }

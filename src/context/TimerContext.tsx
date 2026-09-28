@@ -29,7 +29,7 @@ const defaultState: TimerState = {
 }
 type TimerContextType = {
   timerState: TimerState
-  startTimer: (scheduleId: string, title: string, phases: Phase[], index: number) => void
+  startTimer: (scheduleId: string, title: string, phases: Phase[], index: number) => boolean
   pauseTimer: () => void; resumeTimer: () => void; completePhase: () => void
   resetTimer: () => void; setTimerVisibility: (visible: boolean) => void
 }
@@ -143,17 +143,29 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   }, [user?.id, resetTimer, publish])
 
   const startTimer = useCallback((scheduleId: string, scheduleTitle: string, phases: Phase[], index: number) => {
-    unlockSessionSound()
     const phase = phases[index]
-    if (!phase || !account.current || busy.current) return
+    if (!phase) return false
+    const activeUserId = user?.id ?? null
+    if (!activeUserId) {
+      toast.error(tr('سجّل الدخول لبدء الجلسة', 'Sign in to start a session'))
+      return false
+    }
+    // Keep this in sync even if a user clicks before the auth effect has run.
+    account.current = activeUserId
+    if (busy.current) {
+      toast.error(tr('جارٍ حفظ الجلسة السابقة، حاول بعد لحظة', 'Saving the previous session; try again in a moment'))
+      return false
+    }
     if ((stateRef.current.isRunning || stateRef.current.isPaused) && stateRef.current.scheduleId !== scheduleId) {
-      toast.error(tr('أوقف مؤقت الجدول الحالي أولاً')); return
+      toast.error(tr('أوقف مؤقت الجدول الحالي أولاً')); return false
     }
     publish({ ...defaultState, scheduleId, scheduleTitle, phases,
       isRunning: true, isVisible: true, timeLeft: phase.duration, currentPhaseIndex: index,
       completedPhases: index, totalPhases: phases.length, taskName: phase.taskName ?? null,
       sessionNumber: phase.sessionNumber ?? null, endTime: new Date(Date.now() + phase.duration * 1000).toISOString() })
-  }, [publish])
+    unlockSessionSound()
+    return true
+  }, [publish, tr, user?.id])
   const pauseTimer = useCallback(() => {
     const state = stateRef.current
     if (state.isRunning) publish({ ...state, isRunning: false, isPaused: true,
