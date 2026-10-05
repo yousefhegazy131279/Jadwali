@@ -8,6 +8,7 @@ import { BodyWrapper } from '@/components/BodyWrapper'
 import PWAProvider from '@/components/PWAProvider'
 import { TourProvider } from '@/context/TourContext'
 import TourOverlay from '@/components/TourOverlay'
+import SessionMonitor from '@/components/SessionMonitor'
 
 const cairo = Cairo({
   subsets: ['arabic'],
@@ -46,17 +47,18 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/logo.png" />
       </head>
       <body>
-        <LanguageProvider><TourProvider>
-          <SupabaseProvider>
-            <ThemeProvider>
-              <BodyWrapper>
-                {children}
-                <Toaster position="top-center" richColors />
-              </BodyWrapper>
-            </ThemeProvider>
-          </SupabaseProvider>
-          <TourOverlay />
-        </TourProvider></LanguageProvider>
+      <LanguageProvider><TourProvider>
+  <SupabaseProvider>
+    <ThemeProvider>
+      <SessionMonitor />
+      <BodyWrapper>
+        {children}
+        <Toaster position="top-center" richColors />
+      </BodyWrapper>
+    </ThemeProvider>
+  </SupabaseProvider>
+  <TourOverlay />
+</TourProvider></LanguageProvider>
         <PWAProvider />
       </body>
     </html>
