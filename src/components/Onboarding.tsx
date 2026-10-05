@@ -18,21 +18,21 @@ export default function Onboarding() {
   useEffect(() => {
     if (!user) { setOpen(false); return }
     let active=true
-    const load = async () => {
+    const load = async () => { const { error: ensureError } = await supabase.rpc('ensure_my_profile'); if (ensureError) console.error('Profile self-heal failed:', ensureError);
       const [profile,settings] = await Promise.all([
         supabase.from('profiles').select('onboarding_completed,full_name').eq('id',user.id).single(),
         supabase.from('settings').select('id,prayer_times,pomodoro').eq('user_id',user.id).maybeSingle(),
       ])
-      if (!active || profile.error || settings.error) return
+      if (!active) return; if (profile.error || !profile.data) { console.error('Could not load onboarding profile:', profile.error); toast.error(t('تعذر تحميل ملفك الشخصي. حدّث الصفحة أو سجّل الدخول مجددًا.', 'Could not load your profile. Refresh or sign in again.')); return } if (settings.error) console.error('Could not load onboarding settings:', settings.error)
       setName(profile.data.full_name || fullName || '')
-      setSettingsId(settings.data?.id ?? null)
-      setTimes(normalizePrayerTimes(settings.data?.prayer_times))
-      if(settings.data?.pomodoro) setPom({...settings.data.pomodoro,sessionDuration:settings.data.pomodoro.sessionDuration ?? settings.data.pomodoro.workDuration ?? 50})
+      setSettingsId(settings.error ? null : settings.data?.id ?? null)
+      setTimes(normalizePrayerTimes(settings.error ? null : settings.data?.prayer_times))
+      if(!settings.error && settings.data?.pomodoro) setPom({...settings.data.pomodoro,sessionDuration:settings.data.pomodoro.sessionDuration ?? settings.data.pomodoro.workDuration ?? 50})
       setOpen(!profile.data.onboarding_completed)
     }
     void load()
     return () => { active=false }
-  },[user?.id,supabase,fullName])
+  },[user?.id,supabase,fullName,t])
   if(!open) return null
   const save = async (e:React.FormEvent) => {
     e.preventDefault()
