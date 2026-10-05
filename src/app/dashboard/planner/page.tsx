@@ -302,7 +302,7 @@ function PrayerIcon({ name }: { name: string }) {
 // ==================== Main Page ====================
 export default function PlannerPage() {
   const { t: tr, language } = useLanguage()
-  const { user } = useSupabase()
+  const { user, supabase } = useSupabase()
   const router = useRouter()
   const [generating, setGenerating] = useState(false)
 
@@ -343,7 +343,7 @@ export default function PlannerPage() {
     if (!user) return
     let cancelled = false
     const load = async () => {
-      const { data, error } = await createClient()
+      const { data, error } = await supabase
         .from('settings')
         .select('prayer_times,pomodoro')
         .eq('user_id', user.id)
@@ -370,7 +370,7 @@ export default function PlannerPage() {
       cancelled = true
       window.removeEventListener('focus', load)
     }
-  }, [user?.id])
+  }, [user?.id, supabase])
 
   useEffect(() => {
     AOS.init({ duration: 600, easing: 'ease-out-cubic', once: true, mirror: true })
@@ -516,12 +516,12 @@ export default function PlannerPage() {
     setGenerating(true)
 
     try {
-      const supabase = createClient()
+      const { data: authData, error: authError } = await supabase.auth.getUser(); if (authError || !authData.user) throw new Error(tr('انتهت جلسة الدخول. سجّل الخروج ثم ادخل مجددًا.', 'Your session expired. Sign out and sign in again.')); const ownerId = authData.user.id
 
       const { data: schedule, error: scheduleError } = await supabase
         .from('schedules')
         .insert({
-          user_id: user?.id,
+          user_id: ownerId,
           title: title.trim(),
           day: date,
           start_time: startTime,
@@ -539,7 +539,7 @@ export default function PlannerPage() {
             t.category.trim().length > 0 && t.name.trim().length > 0 && t.duration > 0
         )
         .map((t) => ({
-          user_id: user?.id,
+          user_id: ownerId,
           schedule_id: schedule.id,
           name: t.name.trim(),
           category: t.category.trim(),
@@ -558,7 +558,7 @@ export default function PlannerPage() {
       const sideTasksToInsert = sideTasks
         .filter((t) => t.name.trim().length > 0)
         .map((t) => ({
-          user_id: user?.id,
+          user_id: ownerId,
           schedule_id: schedule.id,
           name: t.name.trim(),
           category: tr('جانبي'),
@@ -577,7 +577,7 @@ export default function PlannerPage() {
       }
 
       const prayersToInsert = prayers.map((p) => ({
-        user_id: user?.id,
+        user_id: ownerId,
         schedule_id: schedule.id,
         day: date,
         name: p.name,
@@ -590,21 +590,21 @@ export default function PlannerPage() {
         .insert(prayersToInsert)
       if (prayerError) throw prayerError
 
-      if (user?.id) {
+      if (ownerId) {
         const notificationTitle = tr('✅ تم إنشاء الجدول بنجاح')
         const notificationBody =
           language === 'ar'
             ? `جدول "${title.trim()}" بتاريخ ${date} يبدأ الساعة ${formatTime12(startTime, language)}.`
             : `Schedule "${title.trim()}" on ${date} starts at ${formatTime12(startTime, language)}.`
         sendBrowserNotification(notificationTitle, notificationBody)
-        await createAppNotification(user.id, notificationTitle, notificationBody, 'success')
+        await createAppNotification(ownerId, notificationTitle, notificationBody, 'success')
       }
 
       toast.success(tr('✅ تم إنشاء الجدول بنجاح!'))
       router.push('/dashboard/schedule')
     } catch (error: any) {
-      console.error(error)
-      toast.error(`${tr('حدث خطأ', 'An error occurred')}: ${error.message || tr('غير معروف')}`)
+      console.error(error); const message = String(error?.message || '')
+      if (/row-level security|rls|permission denied/i.test(message)) toast.error(tr('تعذر التحقق من صلاحية الحساب. حدّث الصفحة، وإذا استمر الخطأ سجّل الخروج ثم ادخل مجددًا.', 'Could not verify account permissions. Refresh the page; if this continues, sign out and sign in again.')); else toast.error(`${tr('حدث خطأ', 'An error occurred')}: ${message || tr('غير معروف')}`)
     } finally {
       setGenerating(false)
     }
