@@ -518,77 +518,51 @@ export default function PlannerPage() {
     try {
       const { data: authData, error: authError } = await supabase.auth.getUser(); if (authError || !authData.user) throw new Error(tr('انتهت جلسة الدخول. سجّل الخروج ثم ادخل مجددًا.', 'Your session expired. Sign out and sign in again.')); const ownerId = authData.user.id
 
-      const { data: schedule, error: scheduleError } = await supabase
-        .from('schedules')
-        .insert({
-          user_id: ownerId,
-          title: title.trim(),
-          day: date,
-          start_time: startTime,
-          pomodoro: pomodoro,
-          project_id: projectId || null,
-        })
-        .select()
-        .single()
-
-      if (scheduleError) throw scheduleError
-
-      const tasksToInsert = tasks
+            const tasksToInsert = tasks
         .filter(
           (t) =>
             t.category.trim().length > 0 && t.name.trim().length > 0 && t.duration > 0
         )
         .map((t) => ({
-          user_id: ownerId,
-          schedule_id: schedule.id,
           name: t.name.trim(),
           category: t.category.trim(),
           duration: t.duration * 60,
           type: 'task',
           priority: 'high',
-          done: false,
-          completed_sessions: 0,
         }))
-
-      if (tasksToInsert.length > 0) {
-        const { error: tasksError } = await supabase.from('tasks').insert(tasksToInsert)
-        if (tasksError) throw tasksError
-      }
 
       const sideTasksToInsert = sideTasks
         .filter((t) => t.name.trim().length > 0)
         .map((t) => ({
-          user_id: ownerId,
-          schedule_id: schedule.id,
           name: t.name.trim(),
           category: tr('جانبي'),
           duration: 0,
           type: 'side',
           priority: 'low',
-          done: false,
-          completed_sessions: 0,
         }))
 
-      if (sideTasksToInsert.length > 0) {
-        const { error: sideError } = await supabase
-          .from('tasks')
-          .insert(sideTasksToInsert)
-        if (sideError) throw sideError
-      }
-
       const prayersToInsert = prayers.map((p) => ({
-        user_id: ownerId,
-        schedule_id: schedule.id,
         day: date,
         name: p.name,
         time: p.time,
-        done: false,
       }))
 
-      const { error: prayerError } = await supabase
-        .from('prayers')
-        .insert(prayersToInsert)
-      if (prayerError) throw prayerError
+      const { data: scheduleId, error: createError } = await supabase.rpc(
+        'create_schedule_with_tasks',
+        {
+          p_title: title.trim(),
+          p_day: date,
+          p_start_time: startTime,
+          p_pomodoro: pomodoro,
+          p_project_id: projectId || null,
+          p_tasks: [...tasksToInsert, ...sideTasksToInsert],
+          p_prayers: prayersToInsert,
+        }
+      )
+      if (createError) throw createError
+      if (typeof scheduleId !== 'string' || !scheduleId) {
+        throw new Error(tr('لم تُرجع قاعدة البيانات معرّف الجدول.', 'The database did not return the new schedule ID.'))
+      }
 
       if (ownerId) {
         const notificationTitle = tr('✅ تم إنشاء الجدول بنجاح')
