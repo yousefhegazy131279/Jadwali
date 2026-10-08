@@ -2,6 +2,7 @@
 
 import { useLanguage } from '@/context/LanguageContext'
 import { useEffect, useState } from 'react'
+import type { ComponentType } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { Logo } from '@/components/Logo'
@@ -14,6 +15,7 @@ import {
   HelpCircle, Star, Award, Users, Rocket, Shield,
 } from 'lucide-react'
 import { FaFacebookF, FaInstagram, FaLinkedinIn, FaGithub, FaWhatsapp } from 'react-icons/fa'
+import { FaTiktok, FaXTwitter, FaYoutube } from 'react-icons/fa6'
 import { toast } from 'sonner'
 
 /* ============================================================
@@ -83,19 +85,37 @@ const FAQS = [
 
 const SOCIALS = [
   {
-    href: 'https://www.facebook.com/ywsf.hjazy.160024',
+    href: 'https://www.youtube.com/@YousefHegazydev',
+    icon: FaYoutube,
+    label: 'YouTube',
+    color: '#EF4444',
+  },
+  {
+    href: 'https://www.tiktok.com/@yousefhegazydev?lang=en',
+    icon: FaTiktok,
+    label: 'TikTok',
+    color: '#EC4899',
+  },
+  {
+    href: 'https://x.com/Yousefhegazy00',
+    icon: FaXTwitter,
+    label: 'X',
+    color: '#94A3B8',
+  },
+  {
+    href: 'https://www.facebook.com/profile.php?id=61594760347792',
     icon: FaFacebookF,
     label: 'Facebook',
     color: '#3B82F6',
   },
   {
-    href: 'https://www.instagram.com/hgz1312/',
+    href: 'https://www.instagram.com/yousef.hegazy.dev/',
     icon: FaInstagram,
     label: 'Instagram',
     color: '#EC4899',
   },
   {
-    href: 'https://www.linkedin.com/in/yousef-hegazy-a0aa13333/',
+    href: 'https://www.linkedin.com/in/yousef-hegazy-a0aa13333',
     icon: FaLinkedinIn,
     label: 'LinkedIn',
     color: '#0EA5E9',
@@ -109,7 +129,7 @@ const SOCIALS = [
 ]
 
 const WHATSAPP_NUMBER = '201117081077'
-const WHATSAPP_DISPLAY = '01117081077'
+const WHATSAPP_DISPLAY = '+201117081077'
 const WHATSAPP_LINK = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent('مرحباً، لدي استفسار عن تطبيق جَدْوَلِي')}`
 
 const EMAIL = 'yousef.hegazy.dev@gmail.com'
@@ -211,7 +231,7 @@ function ContactCard({
   copyLabel,
   actionLabel,
 }: {
-  icon: any
+  icon: ComponentType<{ className?: string }>
   title: string
   value: string
   href: string
@@ -715,12 +735,22 @@ export default function AboutPage() {
 
             <ContactCard
               icon={FaGithub}
-              title={t('مشروع مفتوح المصدر', 'Open source')}
-              value="yousefhegazy131279/Jadwali"
-              href="https://github.com/yousefhegazy131279/Jadwali"
+              title="GitHub"
+              value="yousefhegazy131279"
+              href="https://github.com/yousefhegazy131279"
               accent="#A855F7"
               delay={0.2}
-              actionLabel={t('زيارة الريبو', 'Visit repo')}
+              actionLabel={t('زيارة GitHub', 'Visit GitHub')}
+            />
+
+            <ContactCard
+              icon={ExternalLink}
+              title={t('معرض الأعمال', 'Portfolio')}
+              value="hogz.vercel.app"
+              href="https://hogz.vercel.app"
+              accent="#D4AF37"
+              delay={0.25}
+              actionLabel={t('زيارة معرض الأعمال', 'Visit portfolio')}
             />
           </div>
 

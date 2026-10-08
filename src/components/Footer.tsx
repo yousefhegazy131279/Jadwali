@@ -4,8 +4,9 @@ import { useLanguage } from '@/context/LanguageContext'
 import Link from 'next/link'
 import { Logo } from '@/components/Logo'
 import { motion } from 'framer-motion'
-import { FaFacebookF, FaInstagram, FaLinkedinIn, FaGithub } from 'react-icons/fa'
-import { Heart, ArrowUpRight, Sparkles, Compass, BookOpen } from 'lucide-react'
+import { FaFacebookF, FaInstagram, FaLinkedinIn, FaGithub, FaWhatsapp } from 'react-icons/fa'
+import { FaTiktok, FaXTwitter, FaYoutube } from 'react-icons/fa6'
+import { Heart, ArrowUpRight, Sparkles, Compass, BookOpen, Mail } from 'lucide-react'
 import { memo } from 'react'
 
 /* ============================================================
@@ -13,21 +14,56 @@ import { memo } from 'react'
    ============================================================ */
 const socialLinks = [
   {
-    href: 'https://www.facebook.com/ywsf.hjazy.160024',
+    href: 'https://wa.me/201117081077',
+    icon: FaWhatsapp,
+    labelAr: 'واتساب',
+    labelEn: 'WhatsApp',
+    hover: 'hover:text-emerald-500 hover:border-emerald-500/50 hover:bg-emerald-500/10 hover:shadow-emerald-500/20',
+  },
+  {
+    href: 'mailto:yousef.hegazy.dev@gmail.com',
+    icon: Mail,
+    labelAr: 'البريد الإلكتروني',
+    labelEn: 'Email',
+    hover: 'hover:text-amber-500 hover:border-amber-500/50 hover:bg-amber-500/10 hover:shadow-amber-500/20',
+  },
+  {
+    href: 'https://www.youtube.com/@YousefHegazydev',
+    icon: FaYoutube,
+    labelAr: 'يوتيوب',
+    labelEn: 'YouTube',
+    hover: 'hover:text-red-500 hover:border-red-500/50 hover:bg-red-500/10 hover:shadow-red-500/20',
+  },
+  {
+    href: 'https://www.tiktok.com/@yousefhegazydev?lang=en',
+    icon: FaTiktok,
+    labelAr: 'تيك توك',
+    labelEn: 'TikTok',
+    hover: 'hover:text-pink-500 hover:border-pink-500/50 hover:bg-pink-500/10 hover:shadow-pink-500/20',
+  },
+  {
+    href: 'https://x.com/Yousefhegazy00',
+    icon: FaXTwitter,
+    labelAr: 'إكس',
+    labelEn: 'X',
+    hover: 'hover:text-slate-400 hover:border-slate-400/50 hover:bg-slate-400/10 hover:shadow-slate-400/20',
+  },
+  {
+    href: 'https://www.facebook.com/profile.php?id=61594760347792',
     icon: FaFacebookF,
     labelAr: 'فيسبوك',
     labelEn: 'Facebook',
     hover: 'hover:text-blue-500 hover:border-blue-500/50 hover:bg-blue-500/10 hover:shadow-blue-500/20',
   },
   {
-    href: 'https://www.instagram.com/hgz1312/',
+    href: 'https://www.instagram.com/yousef.hegazy.dev/',
     icon: FaInstagram,
     labelAr: 'انستجرام',
     labelEn: 'Instagram',
     hover: 'hover:text-pink-500 hover:border-pink-500/50 hover:bg-pink-500/10 hover:shadow-pink-500/20',
   },
   {
-    href: 'https://www.linkedin.com/in/yousef-hegazy-a0aa13333/',
+    href: 'https://www.linkedin.com/in/yousef-hegazy-a0aa13333',
     icon: FaLinkedinIn,
     labelAr: 'لينكد إن',
     labelEn: 'LinkedIn',
@@ -332,9 +368,16 @@ export const Footer = memo(function Footer() {
               <Heart className="h-3.5 w-3.5 fill-red-500 text-red-500" />
             </motion.span>
             <span>{t('بواسطة', 'by')}</span>
-            <span className="font-['Amiri'] text-sm font-bold text-[#D4AF37]">
+            <a
+              href="https://hogz.vercel.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-['Amiri'] text-sm font-bold text-[#D4AF37] transition-all duration-300 hover:text-[#FFE27A] hover:drop-shadow-[0_0_8px_rgba(212,175,55,0.95)]"
+              style={{ textShadow: '0 0 7px rgba(212, 175, 55, 0.65)' }}
+              aria-label={t('زيارة موقع HGZ', 'Visit HGZ website')}
+            >
               HGZ
-            </span>
+            </a>
           </div>
         </div>
       </motion.div>
