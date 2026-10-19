@@ -16,15 +16,18 @@ before(async()=>{
  create table projects(id uuid primary key default gen_random_uuid(),user_id uuid,name text);
  create table schedules(id uuid primary key default gen_random_uuid(),user_id uuid,title text,day date,start_time time,pomodoro jsonb,project_id uuid);
  create table tasks(id uuid primary key default gen_random_uuid(),user_id uuid,schedule_id uuid references schedules(id) on delete cascade,name text,category text,type text,duration integer,completed_sessions integer default 0,done boolean default false,priority text);
+ create table settings(user_id uuid primary key,prayer_times jsonb);
  create table prayers(id uuid primary key default gen_random_uuid(),user_id uuid,schedule_id uuid,day date,name text,time time,done boolean);
  create table custom_cards(id uuid primary key,user_id uuid,schedule_id uuid);
  grant usage on schema public,auth to authenticated;grant select,insert,update,delete on all tables in schema public to authenticated;
  insert into auth.users values('${owner}','owner@test.invalid','{}'),('${guest}','guest@test.invalid','{}'),('${stranger}','stranger@test.invalid','{}');`)
  for(const name of ['202609240001_critical_fixes.sql','202609240002_collaboration_projects.sql','202610050002_atomic_schedule_creation.sql'])await db.exec(fs.readFileSync('supabase/migrations/'+name,'utf8'))
  await db.exec(`create table notes(id uuid primary key default gen_random_uuid(),user_id uuid not null references auth.users(id),content text,updated_at timestamptz default now());insert into notes(user_id,content)values('${owner}',null);alter default privileges in schema public grant all on tables to anon,authenticated,service_role;`)
+ await db.exec(`insert into settings values('${owner}','[\"05:27\",\"12:44\",\"16:05\",\"18:31\",\"19:50\"]')`)
  await db.exec(fs.readFileSync('supabase/migrations/20261019033549_productivity_v2_foundation.sql','utf8'))
  await db.exec(`delete from notes;`)
  await db.exec(fs.readFileSync('supabase/migrations/20261019040249_productivity_v2_scheduler.sql','utf8').split('-- Hosted extensions')[0]+'\ncommit;')
+ await db.exec(fs.readFileSync('supabase/migrations/20261019044104_productivity_v2_template_prayers.sql','utf8'))
  await db.exec(`insert into projects values('${project}','${owner}','Private project');insert into schedules(id,user_id,title,day,start_time,pomodoro) values('${schedule}','${owner}','Math',current_date,'08:00','{"workDuration":25}');insert into tasks(id,user_id,schedule_id,name,category,type,duration)values('${task}','${owner}','${schedule}','Math','Study','task',300);`)
 })
 after(async()=>{await db?.close()})
@@ -64,6 +67,9 @@ test('streak uses distinct local dates, keeps the best streak and resets after a
 test('templates create seven plans atomically, are immutable and retry without duplicates',async()=>{
  await as(owner);const count=async()=>(await db.query('select count(*)::int as n from schedules')).rows[0].n;const before=await count()
  const query=`select create_template_plan('exams',current_date,'08:00',null,'60000000-0000-0000-0000-000000000001','en') as ids`
+ const plans=(await db.query(query)).rows[0].ids;
+ assert.equal((await db.query('select count(*)::int as n from prayers where schedule_id=any($1::uuid[])',[plans])).rows[0].n,35);
+ assert.equal((await db.query("select time::text as t from prayers where schedule_id=$1 and name='الفجر'",[plans[0]])).rows[0].t,'05:27:00');
  assert.equal((await db.query(query)).rows[0].ids.length,7);assert.equal((await db.query(query)).rows[0].ids.length,7);assert.equal(await count(),before+7)
  await assert.rejects(db.query(`update templates set days=1`),/permission denied/)
  await as(guest);await assert.rejects(db.query(`select create_template_plan('exams',current_date,'08:00','${project}','60000000-0000-0000-0000-000000000002','ar')`),/does not belong/)

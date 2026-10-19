@@ -469,7 +469,6 @@ export default function SettingsPage() {
   /* ====== العرض ====== */
   return (
     <div className="space-y-5 p-3 sm:p-6">
-      <NotificationPreferences />
       {/* ============ Hero ============ */}
       <motion.section
         initial={{ opacity: 0, y: -12 }}
@@ -544,6 +543,8 @@ export default function SettingsPage() {
           </div>
         </div>
       </motion.section>
+
+      <NotificationPreferences />
 
       {/* ============ الشبكة الرئيسية ============ */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
