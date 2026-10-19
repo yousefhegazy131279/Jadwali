@@ -13,11 +13,13 @@
     "notifications:keys": "node scripts/generate-notification-keys.cjs"
   },
   "dependencies": {
+    "@photostructure/tz-lookup": "11.7.0",
     "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-select": "^2.3.7",
     "@supabase/ssr": "^0.12.6",
     "@supabase/supabase-js": "^2.112.3",
     "@vercel/analytics": "^2.0.1",
+    "adhan": "4.4.6",
     "aos": "^2.3.4",
     "date-fns": "^4.4.0",
     "framer-motion": "^13.1.0",

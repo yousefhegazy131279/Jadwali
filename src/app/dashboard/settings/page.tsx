@@ -1,4 +1,6 @@
 'use client'
+import AutomaticPrayerControls from '@/components/AutomaticPrayerControls'
+import {useAutomaticPrayers} from '@/context/PrayerLocationContext'
 import NotificationPreferences from '@/components/v2/NotificationPreferences'
 
 import { formatTime12 } from '@/lib/time'
@@ -255,6 +257,8 @@ export default function SettingsPage() {
   const [justSaved, setJustSaved] = useState(false)
 
   const [prayerTimes, setPrayerTimes] = useState<string[]>(DEFAULT_PRAYER_TIMES)
+  const automaticPrayers=useAutomaticPrayers()
+  const shownPrayerTimes=automaticPrayers.times||prayerTimes
   const [pomodoro, setPomodoro] = useState(DEFAULT_POMODORO)
 
   const [name, setName] = useState(fullName || '')
@@ -328,6 +332,7 @@ export default function SettingsPage() {
   /* ====== الحفظ ====== */
   const handleSave = async () => {
     if (!user || !settings) return
+    if(!automaticPrayers.ready||automaticPrayers.busy||automaticPrayers.profile&&!automaticPrayers.times){toast.error(t('انتظر تحديد المواقيت أو اختر الوضع اليدوي','Wait for prayer calculation or select manual mode'));return}
 
     // التحقق
     if (pomodoro.sessionDuration < 1 || pomodoro.sessionDuration > 120) {
@@ -346,7 +351,7 @@ export default function SettingsPage() {
       toast.error(t('عدد الدورات يجب أن يكون بين 1 و 10', 'Cycles must be between 1 and 10'))
       return
     }
-    if (prayerTimes.length !== 5 || !prayerTimes.every(isTime)) {
+    if (shownPrayerTimes.length !== 5 || !shownPrayerTimes.every(isTime)) {
       toast.error(t('أدخل مواقيت صلاة صحيحة', 'Enter valid prayer times'))
       return
     }
@@ -356,7 +361,7 @@ export default function SettingsPage() {
     const { data: saved, error } = await supabase
       .from('settings')
       .update({
-        prayer_times: prayerTimes,
+        prayer_times: shownPrayerTimes,
         pomodoro,
         updated_at: new Date().toISOString(),
       })
@@ -379,6 +384,7 @@ export default function SettingsPage() {
 
   const handleReset = () => {
     if (!confirm(t('هل أنت متأكد من إعادة الإعدادات إلى القيم الافتراضية؟', 'Reset all settings to defaults?'))) return
+    if(automaticPrayers.profile)void automaticPrayers.disable()
     setPrayerTimes([...DEFAULT_PRAYER_TIMES])
     setPomodoro({ ...DEFAULT_POMODORO })
     toast.info(t('تم إعادة الإعدادات للقيم الافتراضية', 'Settings reset to defaults'))
@@ -443,10 +449,10 @@ export default function SettingsPage() {
   const isDirty = useMemo(() => {
     if (!settings) return false
     return (
-      JSON.stringify(prayerTimes) !== JSON.stringify(settings.prayer_times) ||
+      JSON.stringify(shownPrayerTimes) !== JSON.stringify(settings.prayer_times) ||
       JSON.stringify(pomodoro) !== JSON.stringify(settings.pomodoro)
     )
-  }, [settings, prayerTimes, pomodoro])
+  }, [settings, shownPrayerTimes, pomodoro])
 
   /* ====== Loading ====== */
   if (loading) {
@@ -719,6 +725,7 @@ export default function SettingsPage() {
           accent="#F59E0B"
           delay={0.2}
         >
+          <AutomaticPrayerControls />
           <div className="space-y-2.5">
             {PRAYER_NAMES.map((prayer, i) => {
               const Icon = prayer.icon
@@ -738,16 +745,17 @@ export default function SettingsPage() {
                   </div>
                   <input
                     type="time"
-                    value={prayerTimes[i] || ''}
+                    value={shownPrayerTimes[i] || ''}
+                    readOnly={!!automaticPrayers.profile}
                     onChange={(e) => updatePrayerTime(i, e.target.value)}
-                    className="flex-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-1.5 font-['Cairo'] text-sm text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                    className="min-w-0 flex-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-1.5 font-['Cairo'] text-sm text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
                     style={{ ['--accent' as string]: prayer.color }}
                   />
                   <div
-                    className="w-20 shrink-0 rounded-lg px-2 py-1 text-center font-mono text-xs font-bold"
+                    className="hidden w-20 shrink-0 rounded-lg px-2 py-1 text-center font-mono sm:block text-xs font-bold"
                     style={{ background: `${prayer.color}15`, color: prayer.color }}
                   >
-                    {formatTime12(prayerTimes[i], language)}
+                    {formatTime12(shownPrayerTimes[i], language)}
                   </div>
                 </div>
               )

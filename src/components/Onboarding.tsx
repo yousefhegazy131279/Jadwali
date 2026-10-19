@@ -4,6 +4,8 @@ import { useSupabase } from '@/lib/supabaseProvider'
 import { useLanguage } from '@/context/LanguageContext'
 import { DEFAULT_PRAYER_TIMES, PRAYER_NAMES, normalizePrayerTimes } from '@/lib/preferences'
 import { toast } from 'sonner'
+import AutomaticPrayerControls from '@/components/AutomaticPrayerControls'
+import {useAutomaticPrayers} from '@/context/PrayerLocationContext'
 import { formatTime12 } from '@/lib/time'
 export default function Onboarding() {
   const { user, supabase, fullName, updateFullName } = useSupabase()
@@ -11,6 +13,7 @@ export default function Onboarding() {
   const [open,setOpen] = useState(false)
   const [step,setStep] = useState(0)
   const [name,setName] = useState('')
+  const automaticPrayers=useAutomaticPrayers()
   const [times,setTimes] = useState(DEFAULT_PRAYER_TIMES)
   const [pom,setPom] = useState({sessionDuration:50,shortBreak:10,longBreak:30,cyclesBeforeLong:4})
   const [settingsId,setSettingsId] = useState<string|null>(null)
@@ -39,8 +42,9 @@ export default function Onboarding() {
     if(step<2) { setStep(step+1); return }
     setBusy(true)
     try {
+      if(!automaticPrayers.ready||automaticPrayers.busy||automaticPrayers.profile&&!automaticPrayers.times)throw new Error('Prayer calculation unavailable')
       await updateFullName(name.trim())
-      const values={user_id:user.id,prayer_times:times,pomodoro:pom,updated_at:new Date().toISOString()}
+      const values={user_id:user.id,prayer_times:automaticPrayers.times||times,pomodoro:pom,updated_at:new Date().toISOString()}
       const result = settingsId ? await supabase.from('settings').update(values).eq('id',settingsId).select().single() : await supabase.from('settings').insert({...values,theme:'dark',primary_color:'#D4AF37'}).select().single()
       if(result.error) throw result.error
       setSettingsId(result.data.id)
@@ -57,7 +61,7 @@ export default function Onboarding() {
       <h2 id="onboarding-title" className="text-2xl font-bold">{t('مرحبًا بك في جَدْوَلِي','Welcome to Jadwali')} · {step+1}/3</h2>
       <progress className="w-full" value={step+1} max={3}/>
       {step===0 && <label className="block">{t('كيف نناديك؟','What should we call you?')}<input autoFocus required minLength={2} maxLength={100} value={name} onChange={e=>setName(e.target.value)} className="v1-input w-full"/></label>}
-      {step===1 && <div><h3>{t('مواقيت الصلاة','Prayer times')}</h3>{times.map((time,i)=><label key={i} className="flex flex-wrap justify-between items-center gap-2 my-2">{t(PRAYER_NAMES[i])}<input className="v1-input" type="time" required value={time} onChange={e=>setTimes(times.map((v,j)=>i===j?e.target.value:v))}/><span>{formatTime12(time,language)}</span></label>)}</div>}
+      {step===1 && <div><h3>{t('مواقيت الصلاة','Prayer times')}</h3><AutomaticPrayerControls/>{(automaticPrayers.times||times).map((time,i)=><label key={i} className="flex flex-wrap justify-between items-center gap-2 my-2">{t(PRAYER_NAMES[i])}<input className="v1-input" type="time" required readOnly={!!automaticPrayers.profile} value={time} onChange={e=>setTimes(times.map((v,j)=>i===j?e.target.value:v))}/><span>{formatTime12(time,language)}</span></label>)}</div>}
       {step===2 && <div><h3>{t('إعدادات بومودورو','Pomodoro settings')}</h3>{([
         ['sessionDuration','مدة العمل','Focus duration',120],['shortBreak','راحة قصيرة','Short break',30],['longBreak','راحة طويلة','Long break',60],['cyclesBeforeLong','عدد الدورات','Cycles before a long break',10],
       ] as const).map(([key,ar,en,max])=><label key={key} className="flex justify-between items-center my-2 gap-2">{t(ar,en)}<input className="v1-input w-24" type="number" required min={1} max={max} value={pom[key]} onChange={e=>setPom({...pom,[key]:Number(e.target.value)})}/></label>)}</div>}

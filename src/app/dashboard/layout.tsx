@@ -6,6 +6,7 @@ import { Footer } from '@/components/Footer'
 import { NeonParticles } from '@/components/NeonParticles'
 import { FloatingTimer } from '@/components/FloatingTimer'
 import Onboarding from '@/components/Onboarding'
+import {PrayerLocationProvider} from '@/context/PrayerLocationContext'
 import { TimerProvider } from '@/context/TimerContext'
 import { ProductivityProvider } from '@/context/ProductivityContext'
 import ProductivityTools from '@/components/v2/ProductivityTools'
@@ -40,7 +41,7 @@ export default function DashboardLayout({
   }, [])
 
   return (
-    <TimerProvider><ProductivityProvider>
+    <PrayerLocationProvider><TimerProvider><ProductivityProvider>
       <div className="relative min-h-screen bg-[var(--bg-primary)] overflow-x-hidden">
         {/* الخلفية الزخرفية */}
         <div className="fixed inset-0 z-0 pointer-events-none">
@@ -68,6 +69,6 @@ export default function DashboardLayout({
           <Footer />
         </main>
       </div>
-    </ProductivityProvider></TimerProvider>
+    </ProductivityProvider></TimerProvider></PrayerLocationProvider>
   )
 }

@@ -10,6 +10,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useSupabase } from '@/lib/supabaseProvider'
 import ProjectPicker from '@/components/ProjectPicker'
 import AIChat from '@/components/AIChat'
+import AutomaticPrayerControls from '@/components/AutomaticPrayerControls'
+import {useAutomaticPrayers} from '@/context/PrayerLocationContext'
 import { DEFAULT_PRAYER_TIMES, PRAYER_NAMES, normalizePrayerTimes } from '@/lib/preferences'
 import { useRouter } from 'next/navigation'
 import AOS from 'aos'
@@ -332,6 +334,7 @@ export default function PlannerPage() {
   })
 
   const [prayerTimes, setPrayerTimes] = useState(DEFAULT_PRAYER_TIMES)
+  const automaticPrayers=useAutomaticPrayers(date)
   const [preferencesReady, setPreferencesReady] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [draftReady, setDraftReady] = useState(false)
@@ -372,7 +375,7 @@ export default function PlannerPage() {
 
   const prayers: Prayer[] = PRAYER_NAMES.map((name, i) => ({
     name,
-    time: prayerTimes[i],
+    time: automaticPrayers.times?.[i] ?? prayerTimes[i],
   }))
 
   // ==================== Load preferences ====================
@@ -580,6 +583,7 @@ export default function PlannerPage() {
           priority: 'low',
         }))
 
+      if(!automaticPrayers.ready||automaticPrayers.busy||automaticPrayers.profile&&!automaticPrayers.times)throw new Error(tr('انتظر تحديد المواقيت أو اختر الوضع اليدوي','Wait for prayer calculation or select manual mode'))
       const prayersToInsert = prayers.map((p) => ({
         day: date,
         name: p.name,
@@ -922,6 +926,7 @@ export default function PlannerPage() {
             delay={0.4}
             accent="emerald"
           >
+            <AutomaticPrayerControls day={date} />
             <div className="space-y-2">
               {prayers.map((p, i) => (
                 <motion.div

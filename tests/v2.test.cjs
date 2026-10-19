@@ -28,6 +28,7 @@ before(async()=>{
  await db.exec(`delete from notes;`)
  await db.exec(fs.readFileSync('supabase/migrations/20261019040249_productivity_v2_scheduler.sql','utf8').split('-- Hosted extensions')[0]+'\ncommit;')
  await db.exec(fs.readFileSync('supabase/migrations/20261019044104_productivity_v2_template_prayers.sql','utf8'))
+ await db.exec(fs.readFileSync('supabase/migrations/20261019050228_geographic_prayer_templates.sql','utf8'))
  await db.exec(`insert into projects values('${project}','${owner}','Private project');insert into schedules(id,user_id,title,day,start_time,pomodoro) values('${schedule}','${owner}','Math',current_date,'08:00','{"workDuration":25}');insert into tasks(id,user_id,schedule_id,name,category,type,duration)values('${task}','${owner}','${schedule}','Math','Study','task',300);`)
 })
 after(async()=>{await db?.close()})
@@ -106,7 +107,7 @@ test('weekly reports include group focus and remain private',async()=>{
  await assert.rejects(db.query(`select generate_weekly_report(current_date+14)`),/Invalid report week/)
 })
 test('all new privileged public RPCs deny anonymous execution',async()=>{
- await admin();const rows=(await db.query(`select p.proname,has_function_privilege('anon',p.oid,'EXECUTE') as anon from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('save_note','create_challenge','join_challenge','challenge_leaderboard','create_focus_room','start_room_phase','finish_room_focus','send_room_message','refresh_productivity','create_template_plan','generate_weekly_report')`)).rows
+ await admin();const rows=(await db.query(`select p.proname,has_function_privilege('anon',p.oid,'EXECUTE') as anon from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('save_note','create_template_plan_geographic','create_challenge','join_challenge','challenge_leaderboard','create_focus_room','start_room_phase','finish_room_focus','send_room_message','refresh_productivity','create_template_plan','generate_weekly_report')`)).rows
  assert.ok(rows.length>=11);assert.ok(rows.every(x=>!x.anon))
 })
 test('reminders are opt-in, deduplicated, service-only and leased once per delivery batch',async()=>{
@@ -134,4 +135,20 @@ test('room ranking is member-only and the host cannot abandon ownership',async()
  await as(guest);await assert.rejects(db.query(`select * from room_leaderboard('${rid}')`),/Join the room/);
  await as(owner);assert.equal((await db.query(`select * from room_leaderboard('${rid}')`)).rows.length,1);
  await assert.rejects(db.query(`select leave_focus_room('${rid}')`),/host must delete/);
+})
+
+test('geographic templates save distinct daily times atomically, retry safely, and reject malformed input',async()=>{
+ await as(owner);const start=(await db.query('select count(*)::int as n from schedules')).rows[0].n
+ const times=Array.from({length:7},(_,i)=>['05:'+String(20+i).padStart(2,'0'),'12:00','15:00','18:00','19:30'])
+ const request='70000000-0000-0000-0000-000000000001'
+ const call=data=>db.query(`select create_template_plan_geographic('exams',current_date,'08:00',null,'${request}','ar',${quote(data)}) as ids`)
+ await assert.rejects(call([['99:99']]),/Invalid daily prayer count/)
+ assert.equal((await db.query('select count(*)::int as n from schedules')).rows[0].n,start)
+ const ids=(await call(times)).rows[0].ids
+ for(let i=0;i<7;i++)assert.equal((await db.query(`select time::text as t from prayers where schedule_id=$1 and name='الفجر'`,[ids[i]])).rows[0].t,times[i][0]+':00')
+ assert.deepEqual((await call(times)).rows[0].ids,ids)
+ assert.equal((await db.query('select count(*)::int as n from schedules')).rows[0].n,start+7)
+ const invalid=times.map(x=>[...x]);invalid[3][2]='99:99'
+ await assert.rejects(db.query(`select create_template_plan_geographic('exams',current_date,'08:00',null,'70000000-0000-0000-0000-000000000002','ar',${quote(invalid)})`),/Invalid prayer time/)
+ assert.equal((await db.query('select count(*)::int as n from schedules')).rows[0].n,start+7)
 })
