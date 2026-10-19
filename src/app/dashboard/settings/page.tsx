@@ -1,4 +1,5 @@
 'use client'
+import NotificationPreferences from '@/components/v2/NotificationPreferences'
 
 import { formatTime12 } from '@/lib/time'
 import { useLanguage } from '@/context/LanguageContext'
@@ -468,6 +469,7 @@ export default function SettingsPage() {
   /* ====== العرض ====== */
   return (
     <div className="space-y-5 p-3 sm:p-6">
+      <NotificationPreferences />
       {/* ============ Hero ============ */}
       <motion.section
         initial={{ opacity: 0, y: -12 }}
@@ -893,7 +895,7 @@ export default function SettingsPage() {
                     {t('الإصدار', 'Version')}
                   </div>
                   <div className="mt-1 font-mono text-sm font-bold text-[var(--text-primary)]">
-                    v1.0.0
+                    v2.0.0
                   </div>
                 </div>
                 <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)]/50 p-3">

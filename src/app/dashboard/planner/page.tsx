@@ -2,7 +2,9 @@
 
 import { formatTime12 } from '@/lib/time'
 import { useLanguage } from '@/context/LanguageContext'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { readCache, saveCache } from '@/lib/offline'
+import { localDate, type Template } from '@/lib/productivity'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { useSupabase } from '@/lib/supabaseProvider'
@@ -307,7 +309,7 @@ export default function PlannerPage() {
   const [generating, setGenerating] = useState(false)
 
   const now = new Date()
-  const todayStr = now.toISOString().split('T')[0]
+  const todayStr = localDate(now)
   const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
 
   const [date, setDate] = useState(todayStr)
@@ -332,6 +334,41 @@ export default function PlannerPage() {
   const [prayerTimes, setPrayerTimes] = useState(DEFAULT_PRAYER_TIMES)
   const [preferencesReady, setPreferencesReady] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [draftReady, setDraftReady] = useState(false)
+  const loadedDraft = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!user || !preferencesReady || loadedDraft.current === user.id) return
+    let active = true
+    void (async () => {
+      type Draft = { title:string;date:string;startTime:string;projectId:string;tasks:TaskItem[];sideTasks:SideTask[];pomodoro:PomodoroSettings }
+      const saved = await readCache<Draft>(user.id, 'planner-draft').catch(() => null)
+      if (!active) return
+      let template: { template:Template;date:string;time:string;project:string;created:number } | null = null
+      try { const raw = sessionStorage.getItem('jadwali-template:' + user.id); if (raw) template = JSON.parse(raw); sessionStorage.removeItem('jadwali-template:' + user.id) } catch { /* Restore the personal draft instead. */ }
+      if (template && Date.now() - template.created < 3600000) {
+        const plan = template.template
+        setTitle(language === 'ar' ? plan.title_ar : plan.title_en); setDate(template.date);setStartTime(template.time);setProjectId(template.project);setPomodoro(plan.pomodoro)
+        setTasks(plan.tasks.filter(x=>x.type==='task').map(x=>({id:crypto.randomUUID(),name:language==='ar'?x.name:x.name_en,category:x.category,duration:x.duration/60})))
+        setSideTasks(plan.tasks.filter(x=>x.type==='side').map(x=>({id:crypto.randomUUID(),name:language==='ar'?x.name:x.name_en})))
+      } else if (saved && Array.isArray(saved.tasks) && Array.isArray(saved.sideTasks)) {
+        setTitle(saved.title);setDate(saved.date);setStartTime(saved.startTime);setProjectId(saved.projectId);setTasks(saved.tasks);setSideTasks(saved.sideTasks);setPomodoro(saved.pomodoro)
+      }
+      loadedDraft.current=user.id;setDraftReady(true)
+    })()
+    return () => { active=false }
+  }, [user?.id,preferencesReady,language])
+  useEffect(() => {
+    if (!user || !draftReady) return
+    const timer=setTimeout(()=>{void saveCache(user.id,'planner-draft',{title,date,startTime,projectId,tasks,sideTasks,pomodoro}).catch(()=>{})},350)
+    return ()=>clearTimeout(timer)
+  },[user?.id,draftReady,title,date,startTime,projectId,tasks,sideTasks,pomodoro])
+  useEffect(() => {
+    const focusTask=()=>document.querySelector<HTMLInputElement>('[data-tour="planner-task"]')?.focus()
+    const timer=new URLSearchParams(window.location.search).get('focus')==='task'?setTimeout(focusTask,400):undefined
+    window.addEventListener('jadwali-focus-task',focusTask)
+    return ()=>{if(timer)clearTimeout(timer);window.removeEventListener('jadwali-focus-task',focusTask)}
+  },[])
 
   const prayers: Prayer[] = PRAYER_NAMES.map((name, i) => ({
     name,
@@ -352,6 +389,7 @@ export default function PlannerPage() {
       if (cancelled) return
       if (error) {
         toast.error(tr('تعذر تحميل الإعدادات'))
+        setPreferencesReady(true)
         return
       }
       setPrayerTimes(normalizePrayerTimes(data?.prayer_times))
@@ -487,6 +525,7 @@ export default function PlannerPage() {
   // ==================== Generate schedule ====================
   const handleGenerate = async () => {
     if (!user || !preferencesReady || generating) return
+    if (!navigator.onLine) { toast.info(tr('مسودتك محفوظة على الجهاز. عُد للاتصال لإنشاء الجدول ومزامنته.', 'Your draft is saved on this device. Reconnect to create and sync the schedule.')); return }
     if (!validateDateTime()) return
 
     const validTasks = tasks.some(
@@ -575,6 +614,7 @@ export default function PlannerPage() {
       }
 
       toast.success(tr('✅ تم إنشاء الجدول بنجاح!'))
+      await saveCache(user.id, 'planner-draft', null).catch(()=>{})
       router.push('/dashboard/schedule')
     } catch (error: any) {
       console.error(error); const message = String(error?.message || '')

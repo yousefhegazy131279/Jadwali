@@ -18,6 +18,7 @@ import { Logo } from '@/components/Logo'
    خلفية الجزيئات
    ============================================================ */
 function BackgroundDecor() {
+  const seeded = (seed:number) => { const value=Math.sin(seed*12.9898+78.233)*43758.5453; return value-Math.floor(value) }
   return (
     <div className="pointer-events-none fixed inset-0 overflow-hidden">
       {/* هالات ضبابية */}
@@ -27,11 +28,11 @@ function BackgroundDecor() {
 
       {/* جزيئات ذهبية */}
       {Array.from({ length: 20 }).map((_, i) => {
-        const size = Math.random() * 3 + 1
-        const left = Math.random() * 100
-        const top = Math.random() * 100
-        const delay = Math.random() * 5
-        const duration = Math.random() * 3 + 4
+        const size = seeded(i*5+1) * 3 + 1
+        const left = seeded(i*5+2) * 100
+        const top = seeded(i*5+3) * 100
+        const delay = seeded(i*5+4) * 5
+        const duration = seeded(i*5+5) * 3 + 4
         return (
           <motion.div
             key={i}

@@ -1,4 +1,5 @@
 import './globals.css'
+import './v2.css'
 import { LanguageProvider } from '@/context/LanguageContext'
 import { SupabaseProvider } from '@/lib/supabaseProvider'
 import { ThemeProvider } from '@/context/ThemeContext'

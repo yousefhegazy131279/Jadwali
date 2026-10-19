@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useSupabase } from '@/lib/supabaseProvider'
 import { completedPhaseCount, remainingSeconds, taskSessionNumber } from '@/lib/progress'
 import { playSessionSound, unlockSessionSound } from '@/lib/sessionSound'
+import { enqueue } from '@/lib/offline'
 
 type Phase = {
   type: 'work' | 'shortBreak' | 'longBreak'
@@ -76,10 +77,16 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     const userId = account.current
     try {
       if (phase.type === 'work' && phase.taskId) {
-        const { error } = await createClient().rpc('record_work_session', {
+        const payload = {
           p_task_id: phase.taskId, p_session_number: taskSessionNumber(previous.phases, index),
-        })
-        if (error) throw error
+        }
+        if (!navigator.onLine && userId) {
+          await enqueue({id:`session:${userId}:${phase.taskId}:${payload.p_session_number}`,userId,kind:'session',payload,created:Date.now()})
+          toast.info(tr('انتهت الجلسة؛ حفظها على الخادم ينتظر الاتصال.', 'Session ended; server credit will sync when online.'))
+        } else {
+          const { error } = await createClient().rpc('record_work_session', payload)
+          if (error) throw error
+        }
       }
       if (account.current !== userId || stateRef.current.scheduleId !== previous.scheduleId || stateRef.current.currentPhaseIndex !== index) return
       const next = previous.phases[index + 1]

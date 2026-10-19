@@ -36,6 +36,7 @@ export default function SessionMonitor() {
 
     // ✅ 2. فحص أولي عند mount
     const initialCheck = async () => {
+      if (!navigator.onLine) return
       const { data: { session } } = await supabase.auth.getSession()
 
       if (!session) {
@@ -70,6 +71,7 @@ export default function SessionMonitor() {
 
     // ✅ 3. فحص دوري كل 5 دقائق
     const interval = setInterval(async () => {
+      if (!navigator.onLine) return
       const { data: { session } } = await supabase.auth.getSession()
 
       if (!session) {

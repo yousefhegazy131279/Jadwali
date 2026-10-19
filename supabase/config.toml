@@ -1,0 +1,6 @@
+project_id = "jadwali"
+
+# This cron-only worker validates x-jadwali-cron-secret before privileged work.
+# It does not accept the public anon key as permission to dispatch notifications.
+[functions.dispatch-reminders]
+verify_jwt = false

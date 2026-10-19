@@ -7,6 +7,8 @@ import { NeonParticles } from '@/components/NeonParticles'
 import { FloatingTimer } from '@/components/FloatingTimer'
 import Onboarding from '@/components/Onboarding'
 import { TimerProvider } from '@/context/TimerContext'
+import { ProductivityProvider } from '@/context/ProductivityContext'
+import ProductivityTools from '@/components/v2/ProductivityTools'
 import AOS from 'aos'
 import 'aos/dist/aos.css'
 
@@ -38,7 +40,7 @@ export default function DashboardLayout({
   }, [])
 
   return (
-    <TimerProvider>
+    <TimerProvider><ProductivityProvider>
       <div className="relative min-h-screen bg-[var(--bg-primary)] overflow-x-hidden">
         {/* الخلفية الزخرفية */}
         <div className="fixed inset-0 z-0 pointer-events-none">
@@ -59,12 +61,13 @@ export default function DashboardLayout({
           } pr-0`}
         >
           <div className="flex-1 min-w-0 px-2 pt-20 pb-4 sm:px-4 md:pt-6">
+            <ProductivityTools />
             {children}
           </div>
           {/* الفوتر يظهر دائمًا أسفل المحتوى */}
           <Footer />
         </main>
       </div>
-    </TimerProvider>
+    </ProductivityProvider></TimerProvider>
   )
 }

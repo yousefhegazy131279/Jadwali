@@ -13,6 +13,7 @@ import {
   LayoutDashboard, Calendar, Clock, FolderOpen, Settings, LogOut,
   User, PanelLeftClose, PanelLeftOpen, Sun, Moon, Menu, X, Shield,
   BarChart3, Users, FolderKanban, Sparkles, ChevronLeft, ChevronRight,
+  StickyNote, Trophy, LayoutTemplate, Target, Headphones, FileBarChart, WifiOff, BookOpen,
 } from 'lucide-react'
 
 /* ============================================================
@@ -52,6 +53,11 @@ const navGroups: NavGroup[] = [
       { href: '/dashboard/workspace', icon: FolderOpen, labelAr: 'المهام', labelEn: 'Tasks' },
       { href: '/dashboard/projects', icon: FolderKanban, labelAr: 'المشاريع', labelEn: 'Projects' },
       { href: '/dashboard/shared', icon: Users, labelAr: 'المشترك', labelEn: 'Shared' },
+      { href: '/dashboard/notes', icon: StickyNote, labelAr: 'الملاحظات', labelEn: 'Notes' },
+      { href: '/dashboard/templates', icon: LayoutTemplate, labelAr: 'القوالب', labelEn: 'Templates' },
+      { href: '/dashboard/challenges', icon: Target, labelAr: 'التحديات', labelEn: 'Challenges' },
+      { href: '/dashboard/rooms', icon: Headphones, labelAr: 'تركيز مع الأصدقاء', labelEn: 'Focus rooms' },
+      { href: 'https://anamuslim-hgz.vercel.app', icon: BookOpen, labelAr: 'أنا مسلم — الأذكار', labelEn: 'Ana Muslim — Adhkar' },
     ],
   },
   {
@@ -60,6 +66,9 @@ const navGroups: NavGroup[] = [
     labelEn: 'Insights',
     items: [
       { href: '/dashboard/analytics', icon: BarChart3, labelAr: 'الإحصائيات', labelEn: 'Analytics' },
+      { href: '/dashboard/achievements', icon: Trophy, labelAr: 'الإنجازات', labelEn: 'Achievements' },
+      { href: '/dashboard/reports', icon: FileBarChart, labelAr: 'التقارير الأسبوعية', labelEn: 'Weekly reports' },
+      { href: '/dashboard/offline', icon: WifiOff, labelAr: 'المزامنة والعمل دون اتصال', labelEn: 'Offline and sync' },
       { href: '/dashboard/settings', icon: Settings, labelAr: 'الإعدادات', labelEn: 'Settings' },
     ],
   },
@@ -130,6 +139,7 @@ export const Sidebar = memo(function Sidebar() {
     setIsCollapsed(next)
     try {
       localStorage.setItem('sidebar-collapsed', String(next))
+      window.dispatchEvent(new Event('storage'))
     } catch {
       /* ignore */
     }
@@ -252,6 +262,8 @@ export const Sidebar = memo(function Sidebar() {
                     <Tooltip key={href} label={label} show={collapsed} side={tooltipSide}>
                       <Link
                         href={href}
+                        target={href.startsWith('https://')?'_blank':undefined}
+                        rel={href.startsWith('https://')?'noopener noreferrer':undefined}
                         onClick={() => setMobileOpen(false)}
                         aria-current={active ? 'page' : undefined}
                         className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 font-['Cairo'] text-sm transition-all duration-200 ${

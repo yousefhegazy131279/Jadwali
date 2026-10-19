@@ -1,6 +1,6 @@
 {
   "name": "jadwali",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/*.test.cjs"
+    "test": "node --test tests/*.test.cjs",
+    "test:fixture": "node tests/fixture-server.cjs",
+    "notifications:keys": "node scripts/generate-notification-keys.cjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",
@@ -19,26 +21,29 @@
     "aos": "^2.3.4",
     "date-fns": "^4.4.0",
     "framer-motion": "^13.1.0",
+    "lottie-react": "3.1.2",
     "lucide-react": "^1.31.0",
     "next": "16.3.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-hook-form": "^7.85.0",
     "react-icons": "^5.7.0",
-    "sonner": "^2.0.8",
     "recharts": "3.10.1",
-    "lottie-react": "3.1.2"
+    "sonner": "^2.0.8",
+    "web-push": "3.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@tailwindcss/postcss": "^4",
     "@types/aos": "^3.0.8",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "3.6.4",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
+    "fake-indexeddb": "6.2.6",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "@electric-sql/pglite": "0.5.8"
+    "typescript": "^5"
   }
 }

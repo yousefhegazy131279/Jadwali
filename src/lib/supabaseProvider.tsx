@@ -3,6 +3,7 @@ import { useLanguage, translate as tr, LanguageToggle } from '@/context/Language
 import { createClient } from '@/lib/supabase/client'
 import { createContext, useContext, useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { setOfflineAccount } from '@/lib/offline'
 
 type SupabaseContextType = {
   supabase: ReturnType<typeof createClient>
@@ -29,11 +30,14 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let active = true
-    void supabase.auth.getUser().then(({ data }) => {
+    void supabase.auth.getUser().then(({ data, error }) => {
+      if (error && !navigator.onLine) return
+      if (active) setOfflineAccount(data.user?.id??null)
       if (active) { setUser(data.user); if (!data.user) { setIsAdmin(false); setIsLoading(false) } }
     })
     // Never await a Supabase query inside the auth callback: the auth lock is held.
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setOfflineAccount(session?.user.id??null)
       setUser(session?.user ?? null)
       if (!session?.user) { setFullName(null); setAvatarUrl(null); setIsAdmin(false); setIsLoading(false) }
     })

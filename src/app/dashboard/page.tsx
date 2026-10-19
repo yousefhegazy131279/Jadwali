@@ -20,6 +20,7 @@ import {
 import { format } from 'date-fns'
 import { ar, enUS } from 'date-fns/locale'
 import { useTimer } from '@/context/TimerContext'
+import ProgressHub from '@/components/v2/ProgressHub'
 import WelcomeAnimation from '@/components/WelcomeAnimation'
 import { useTour } from '@/context/TourContext'
 
@@ -637,6 +638,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="relative z-10 space-y-6">
+        <ProgressHub />
         {/* ============ Header ============ */}
         <motion.header
           initial={{ opacity: 0, y: -12 }}

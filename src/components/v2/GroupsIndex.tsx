@@ -1,0 +1,28 @@
+'use client'
+import {useState,useCallback,useEffect,type FormEvent} from 'react'
+import Link from 'next/link'
+import {useRouter} from 'next/navigation'
+import {useSupabase} from '@/lib/supabaseProvider'
+import {useLanguage} from '@/context/LanguageContext'
+import {type Challenge,type FocusRoom,localDate,errorText} from '@/lib/productivity'
+import {FeaturePage,Panel,Modal,Alert,Busy,Empty,useFeatureData} from './FeatureUI'
+import {toast} from 'sonner'
+export default function GroupsIndex({kind}:{kind:'challenges'|'rooms'}){
+ const isChallenge=kind==='challenges';const {t,language}=useLanguage(),{user,supabase}=useSupabase(),router=useRouter()
+ const [dates]=useState(()=>({start:localDate(),end:localDate(new Date(Date.now()+29*86400000))}));const [modal,setModal]=useState<'create'|'join'|null>(null),[busy,setBusy]=useState(false),[search,setSearch]=useState('')
+ const [invite,setInvite]=useState('');useEffect(()=>{const code=new URLSearchParams(window.location.search).get('join')||'';if(/^[a-f0-9]{12}$/i.test(code))queueMicrotask(()=>{setInvite(code);setModal('join')})},[])
+ const load=useCallback(async()=>{const r=await supabase.from(isChallenge?'challenges':'focus_rooms').select('*').order('created_at',{ascending:false});if(r.error)throw r.error;return r.data as (Challenge&FocusRoom)[]},[supabase,isChallenge]);const {data,loading,error,refresh}=useFeatureData(load,!!user)
+ async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();setBusy(true);const d=new FormData(e.currentTarget);try{
+  let result
+  if(modal==='join')result=await supabase.rpc(isChallenge?'join_challenge':'join_focus_room',{p_code:String(d.get('code')).trim(),p_display_name:String(d.get('alias')).trim()})
+  else result=isChallenge?await supabase.rpc('create_challenge',{p_title:String(d.get('title')).trim(),p_starts_on:d.get('start'),p_ends_on:d.get('end'),p_goal_minutes:Number(d.get('goal')),p_display_name:String(d.get('alias')).trim()}):await supabase.rpc('create_focus_room',{p_title:String(d.get('title')).trim(),p_display_name:String(d.get('alias')).trim()})
+  if(result.error)throw result.error;router.push(`/dashboard/${kind}/${result.data}`)
+ }catch(e){toast.error(errorText(e,language==='ar'))}finally{setBusy(false)}}
+ return <FeaturePage title={isChallenge?t('تحديات تدفعك للأمام','Challenges that move you forward'):t('ركّزوا معًا','Focus together')} description={isChallenge?t('تحدٍّ خاص بكود دعوة، ونتائج من الجلسات المسجلة بعد الانضمام.','Private invitation codes, with scores from recorded focus after joining.'):t('غرف خاصة بمؤقت مشترك ودردشة. لا تبدأ الجلسة إلا من المضيف.','Private rooms with a shared timer and chat. Only the host starts a phase.')} actions={<><button className="v2-button" onClick={()=>setModal('create')}>{isChallenge?t('تحدٍ جديد','New challenge'):t('غرفة جديدة','New room')}</button><button className="v2-button secondary" onClick={()=>setModal('join')}>{t('انضمام بكود','Join with code')}</button></>}>
+ <Panel><input value={search} onChange={e=>setSearch(e.target.value)} aria-label={t('بحث','Search')} placeholder={t('ابحث بالعنوان…','Search by title…')}/></Panel>{error&&<Alert message={error} retry={()=>void refresh()}/>}{loading?<Busy/>:data?.length?<div className="v2-grid">{data.filter(x=>x.title.toLowerCase().includes(search.toLowerCase())).map(x=><Panel key={x.id}><h2>{x.title}</h2><p className="v2-muted">{isChallenge?`${x.starts_on} — ${x.ends_on}`:x.phase==='work'?t('جلسة تركيز','Focus session'):x.phase==='break'?t('استراحة','Break'):t('جاهزة للبدء','Ready to start')}</p>{isChallenge&&<p>{x.goal_minutes} {t('دقيقة — الهدف الشخصي','minutes — personal goal')}</p>}<Link className="v2-button secondary" href={`/dashboard/${kind}/${x.id}`}>{t('فتح','Open')}</Link></Panel>)}</div>:!error&&<Empty>{t('أنشئ مساحة خاصة أو انضم بكود دعوة. لن تظهر بياناتك في قائمة عامة.','Create a private space or join with an invitation code. Your information is not listed publicly.')}</Empty>}
+ <Modal open={!!modal} onClose={()=>{if(!busy)setModal(null)}} title={modal==='join'?t('انضمام بكود الدعوة','Join by invitation'):isChallenge?t('إنشاء تحدٍ','Create challenge'):t('إنشاء غرفة','Create room')}><form className="v2-form" onSubmit={submit} key={modal}>
+ <label>{t('اسمك الظاهر للمجموعة','Your name in this group')}<input name="alias" required maxLength={60} autoComplete="nickname"/></label>
+ {modal==='join'?<label>{t('كود الدعوة','Invitation code')}<input name="code" defaultValue={invite} required minLength={12} maxLength={12} pattern="[a-fA-F0-9]{12}" dir="ltr" autoCapitalize="characters"/></label>:<><label>{t('العنوان','Title')}<input name="title" required maxLength={120}/></label>{isChallenge&&<><label>{t('من','From')}<input name="start" type="date" required defaultValue={dates.start}/></label><label>{t('إلى','To')}<input name="end" type="date" required defaultValue={dates.end}/></label><label>{t('هدف كل عضو بالدقائق','Each member’s target in minutes')}<input name="goal" type="number" required min={1} max={100000} defaultValue={600}/></label><p className="v2-hint">{t('تُحسب حدود أيام التحدي بتوقيت UTC نفسه لكل الأعضاء. الأيام والتوقيت لا يتغيران بعد الإنشاء.','Challenge days use UTC for all participants. Dates and targets are fixed after creation.')}</p></>}</>}
+ <button className="v2-button" disabled={busy}>{busy?t('جارٍ التنفيذ…','Working…'):modal==='join'?t('انضمام','Join'):t('إنشاء','Create')}</button></form></Modal>
+ </FeaturePage>
+}

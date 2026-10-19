@@ -354,7 +354,7 @@ export const Footer = memo(function Footer() {
           <div className="flex items-center gap-2 rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)]/60 px-3 py-1 font-['Cairo'] text-[10px] text-[var(--text-muted)]">
             <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]" />
             <span>{t('الإصدار', 'Version')}</span>
-            <span className="font-mono font-bold text-[var(--text-secondary)]">v1.0</span>
+            <span className="font-mono font-bold text-[var(--text-secondary)]">v2.0</span>
           </div>
 
           {/* صنع بـ ❤️ */}

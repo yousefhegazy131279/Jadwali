@@ -213,7 +213,7 @@ export default function TourOverlay() {
       dir={language === 'ar' ? 'rtl' : 'ltr'}
       role="dialog"
       aria-modal="true"
-      aria-label={t(step.title)}
+      aria-label={t(step.title, step.titleEn)}
     >
       {/* ===== Spotlight على العنصر ===== */}
       <AnimatePresence>
@@ -305,11 +305,11 @@ export default function TourOverlay() {
                 <div className="min-w-0">
                   {step.category && (
                     <div className="font-['Cairo'] text-[10px] font-bold uppercase tracking-wider text-[#D4AF37]">
-                      {t(step.category, step.category)}
+                      {t(step.category, step.categoryEn || step.category)}
                     </div>
                   )}
                   <h3 className="truncate font-['Amiri'] text-lg font-bold text-[var(--text-primary)] sm:text-xl">
-                    {t(step.title)}
+                    {t(step.title, step.titleEn)}
                   </h3>
                 </div>
               </div>
@@ -325,7 +325,7 @@ export default function TourOverlay() {
 
             {/* الوصف */}
             <p className="font-['Cairo'] text-sm leading-relaxed text-[var(--text-secondary)]">
-              {t(step.description)}
+              {t(step.description, step.descriptionEn)}
             </p>
 
             {/* تنبيه الإجراء المطلوب */}

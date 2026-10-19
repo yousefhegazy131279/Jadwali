@@ -1,6 +1,9 @@
 export type TourStep = {
   path: string
   selector: string
+  titleEn?: string
+  descriptionEn?: string
+  categoryEn?: string
   title: string
   description: string
   /** مفتاح أيقونة يُفسَّر في TourOverlay */
@@ -99,4 +102,13 @@ export const tourSteps: TourStep[] = [
     category: 'التخصيص',
     action: 'wait',
   },
+  ...[
+    ['/dashboard/templates','ابدأ بقالب','Start with a template','اختر نمط يومك، عاين المهام، ثم خصص اليوم الأول أو أنشئ الخطة كاملة. قالب الامتحانات ينشئ سبعة أيام منفصلة.','Preview a routine, customize its first day or create the full plan. The exam template creates seven separate days.','calendar'],
+    ['/dashboard/notes','أفكار مرتبطة بالخطة','Notes linked to your plan','أنشئ ملاحظة واختر لونها وثبت المهمة منها واربطها بجدول أو مشروع. يمكنك تعديلها دون اتصال ومراجعة المزامنة لاحقًا.','Create, color and pin notes, then link them to a schedule or project. Edit offline and review sync later.','tasks'],
+    ['/dashboard/achievements','راقب تقدمك الحقيقي','See your real progress','الإنجازات والسلسلة تأتي من الجلسات المسجلة، لا من فتح الصفحة. كل إنجاز يوضح هدفه وتقدمك إليه.','Achievements and streaks come from recorded focus, not page visits. Each award shows its target and your progress.','chart'],
+    ['/dashboard/challenges','تحدٍ مع أصدقائك','Challenge your friends','أنشئ تحديًا باسم ظاهر وكود خاص أو انضم بكود صديقك. لا تُحتسب إلا دقائق التركيز المسجلة بعد الانضمام وخلال مدة التحدي.','Create a private invitation or join a friend’s code. Only recorded focus after joining and during the challenge counts.','users'],
+    ['/dashboard/rooms','جلسة جماعية','Focus together','أنشئ غرفة وشارك كودها. المضيف يبدأ المؤقت للجميع. انضم قبل الجولة ثم احفظ جلستك عند اكتمالها؛ الدردشة للتشجيع.','Create a room and share its code. The host starts the shared timer. Join before a phase and save your credit when it ends; use chat for encouragement.','users'],
+    ['/dashboard/reports','راجع أسبوعك','Review your week','اختر أسبوعًا لترى الجلسات وساعات التركيز وأفضل يوم ونسبة إنجاز المهام. يمكنك تصدير التقرير أو طباعته. إرسال البريد مؤجل.','Choose a week to see focus, your best day and task completion. Export or print your report. Email delivery is deferred.','chart'],
+    ['/dashboard/offline','العمل دون اتصال','Work offline','الصفحات المحملة والملاحظات والمسودات متاحة على الجهاز. راجع العمليات المعلقة والتعارضات هنا؛ إنشاء الجداول والذكاء الاصطناعي يحتاجان الإنترنت.','Loaded pages, notes and drafts remain on your device. Review queued changes and conflicts here; cloud creation and AI require a connection.','settings']
+  ].map(([path,title,titleEn,description,descriptionEn,icon])=>({path,selector:'h1',title,titleEn,description,descriptionEn,icon:icon as TourStep['icon'],action:'wait' as const})),
 ]

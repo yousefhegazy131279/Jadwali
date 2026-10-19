@@ -4,3 +4,6 @@ node_modules/
 !.env.example
 .DS_Store
 *.tsbuildinfo
+supabase/.temp/
+test-results/
+test-results-v2-*.json
