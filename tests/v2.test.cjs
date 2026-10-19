@@ -29,6 +29,7 @@ before(async()=>{
  await db.exec(fs.readFileSync('supabase/migrations/20261019040249_productivity_v2_scheduler.sql','utf8').split('-- Hosted extensions')[0]+'\ncommit;')
  await db.exec(fs.readFileSync('supabase/migrations/20261019044104_productivity_v2_template_prayers.sql','utf8'))
  await db.exec(fs.readFileSync('supabase/migrations/20261019050228_geographic_prayer_templates.sql','utf8'))
+ await db.exec(fs.readFileSync('supabase/migrations/20261019054536_diverse_template_catalog.sql','utf8'))
  await db.exec(`insert into projects values('${project}','${owner}','Private project');insert into schedules(id,user_id,title,day,start_time,pomodoro) values('${schedule}','${owner}','Math',current_date,'08:00','{"workDuration":25}');insert into tasks(id,user_id,schedule_id,name,category,type,duration)values('${task}','${owner}','${schedule}','Math','Study','task',300);`)
 })
 after(async()=>{await db?.close()})
@@ -75,6 +76,24 @@ test('templates create seven plans atomically, are immutable and retry without d
  await assert.rejects(db.query(`update templates set days=1`),/permission denied/)
  await as(guest);await assert.rejects(db.query(`select create_template_plan('exams',current_date,'08:00','${project}','60000000-0000-0000-0000-000000000002','ar')`),/does not belong/)
  assert.equal((await db.query(`select count(*)::int as n from schedules where user_id='${guest}'`)).rows[0].n,1)
+})
+test('the expanded bilingual catalog creates usable plans and preserves side tasks without changing access',async()=>{
+ await admin()
+ const catalog=(await db.query('select * from templates order by id')).rows
+ assert.equal(catalog.length,16)
+ await db.exec(fs.readFileSync('supabase/migrations/20261019054536_diverse_template_catalog.sql','utf8'))
+ assert.equal((await db.query('select count(*)::int as n from templates')).rows[0].n,16)
+ await as(owner)
+ for(const template of catalog.filter(x=>!['student','work-study','ramadan','exams'].includes(x.id))){
+  assert.ok(template.title_ar.trim()&&template.title_en.trim()&&template.description_ar.trim()&&template.description_en.trim())
+  assert.ok(template.tasks.every(task=>task.name.trim()&&task.name_en.trim()&&['task','side'].includes(task.type)))
+  const ids=(await db.query('select create_template_plan($1,current_date,\'08:00\',null,gen_random_uuid(),\'en\') as ids',[template.id])).rows[0].ids
+  assert.equal(ids.length,template.days)
+  const tasks=(await db.query('select name,type,duration from tasks where schedule_id=$1',[ids[0]])).rows
+  for(const expected of template.tasks){const actual=tasks.find(x=>x.name===expected.name_en);assert.ok(actual);assert.equal(actual.type,expected.type);assert.equal(actual.duration,expected.duration)}
+  assert.equal((await db.query('select count(*)::int as n from prayers where schedule_id=any($1::uuid[])',[ids])).rows[0].n,template.days*5)
+ }
+ await assert.rejects(db.query("insert into templates(id,title_ar,title_en,description_ar,description_en,days,tasks)values('fake','x','x','x','x',1,'[]')"),/permission denied/)
 })
 test('challenge invitations do not expose private data and scores count after joining only',async()=>{
  await as(owner);const id=(await db.query(`select create_challenge('Private goal',current_date,current_date+30,600,'Owner alias') as id`)).rows[0].id
