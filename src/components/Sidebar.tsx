@@ -110,7 +110,7 @@ function Tooltip({ children, label, show, side }: { children: React.ReactNode; l
    ============================================================ */
 export const Sidebar = memo(function Sidebar() {
   const pathname = usePathname()
-  const { supabase, user, isAdmin } = useSupabase()
+  const { supabase, user, fullName, isAdmin } = useSupabase()
   const { theme, toggleTheme } = useTheme()
   const { language, t } = useLanguage()
 
@@ -158,7 +158,7 @@ export const Sidebar = memo(function Sidebar() {
   const collapsed = isCollapsed && !mobileOpen && mounted
   const showLabels = !collapsed
 
-  const userName = user?.email?.split('@')[0] || t('مستخدم', 'User')
+  const userName = fullName?.trim() || user?.email?.split('@')[0] || t('مستخدم', 'User')
 
   return (
     <>
