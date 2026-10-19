@@ -35,7 +35,7 @@ export async function runNotifications(){
   }
   if(['pending','failed'].includes(emailStatus)){
    const prefs=await client.from('productivity_preferences').select('weekly_email').eq('user_id',job.user_id).maybeSingle()
-   if(!prefs.data?.weekly_email)emailStatus='skipped'
+   if(!prefs.data?.weekly_email||process.env.ENABLE_WEEKLY_EMAIL!=='true')emailStatus='skipped'
    else if(!process.env.RESEND_API_KEY||!process.env.REPORT_FROM_EMAIL){emailStatus='failed';error='email_not_configured'}
    else{
     const auth=await client.auth.admin.getUserById(job.user_id);const email=auth.data.user?.email
